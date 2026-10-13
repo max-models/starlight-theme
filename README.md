@@ -160,8 +160,17 @@ back to the tag afterwards). A plain `npm install ../../starlight-theme` symlink
 and does not build: the theme's dependencies (starlight-pydocs) then resolve from this
 repository's `node_modules` instead of the project's.
 
-## Releasing
+## Branches, CI and releases
 
-Bump `version` in `package.json`, tag `vX.Y.Z`, and push the tag. Projects update with
-`npm install github:max-models/starlight-theme#vX.Y.Z` in `docs/` and the same tag in their
-docs workflow; Dependabot or Renovate can open those bumps.
+Work happens on `devel`; `main` holds the releases.
+
+| Workflow | When | What |
+|---|---|---|
+| `test_pytest.yml` | push / pull request to `main` or `devel` | tests of the notebook tool |
+| `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `devel` |
+| `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already |
+| `docs.yml` | called by the projects | the reusable docs build |
+
+To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. Projects then
+update with `npm install github:max-models/starlight-theme#vX.Y.Z` in `docs/` and the same tag in
+their docs workflow; Dependabot or Renovate can open those bumps.

@@ -1,11 +1,11 @@
 // @ts-check
-// The theme's own example site, built in CI and served at https://max-models.github.io/starlight-theme/.
+// The theme's own example site, built in CI and served at https://max-models.github.io/starlight-theme/
+// (deployed from devel).
 // A project's docs/astro.config.mjs looks the same, minus the editLink override.
 import { defineDocs } from '@max-models/starlight-theme';
 
 export default defineDocs({
 	repo: 'starlight-theme',
-	branch: 'main',
 	title: 'starlight-theme',
 	description: 'The shared docs setup of the max-models projects, shown on a small example package.',
 	pythonPackage: 'example_pkg',
@@ -30,6 +30,6 @@ export default defineDocs({
 		},
 	],
 	starlight: {
-		editLink: { baseUrl: 'https://github.com/max-models/starlight-theme/edit/main/example/docs/' },
+		editLink: { baseUrl: 'https://github.com/max-models/starlight-theme/edit/devel/example/docs/' },
 	},
 });
