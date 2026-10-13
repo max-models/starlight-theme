@@ -22,7 +22,7 @@ its pages import always come in matching versions.
 In `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.1.0
+npm install github:max-models/starlight-theme#v0.2.0
 ```
 
 `docs/package.json` then needs only:
@@ -31,7 +31,7 @@ npm install github:max-models/starlight-theme#v0.1.0
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.1.0",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.2.0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -90,11 +90,14 @@ the nearest `.venv`, else `python3`), which needs `nbclient`, `nbformat` and `ip
 "starlight-notebooks": { "source": "../guides", "mpiRanks": 4 }
 ```
 
-`source` is the notebook directory, `section` the URL section (default: the directory name),
+`source` is the notebook directory, which may have subdirectories (the pages are named after
+the notebooks alone, so the directories only organise the sources), `section` the URL section
+(default: the directory name),
 `mpiRanks` runs every notebook under `mpiexec -n <ranks>` when mpi4py and an MPI launcher are
 installed (`DOCS_MPI_RANKS=1` for a quick serial run). The cell tags `remove-cell`, `hide-input`,
-`fold-input`, `remove-output` and `raises-exception` are honoured, and notebook metadata
-`docs_order` sets the sidebar position. See the docstring of `tools/notebooks.py` for the rest.
+`fold-input`, `fold-output` (outputs in a closed box, titled by the cell metadata `fold_summary`),
+`remove-output`, `raises-exception` and nbclient's `skip-execution` are honoured, and notebook
+metadata `docs_order` sets the sidebar position. See the docstring of `tools/notebooks.py` for the rest.
 
 The Makefile targets become:
 
@@ -129,7 +132,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.1.0
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.2.0
     with:
       smoke-paths: |
         tutorials/index.html

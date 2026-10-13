@@ -155,3 +155,49 @@ def test_changed_notebook_is_not_run(project, monkeypatch):
     assert "  order: 3" in page  # the older `guide.order` metadata
     with pytest.raises(SystemExit):
         run(project, "convert", "--strict", monkeypatch=monkeypatch)
+
+
+def test_notebooks_in_subdirectories(project, monkeypatch):
+    v4 = nbformat.v4
+    guides = project / "guides"
+    (guides / "drawing").mkdir()
+    (guides / "drawing" / ".ipynb_checkpoints").mkdir()
+    write_notebook(guides / "drawing" / "b_paths.ipynb", [v4.new_markdown_cell("# Paths")])
+    write_notebook(guides / "drawing" / ".ipynb_checkpoints" / "b_paths-checkpoint.ipynb", [])
+    write_notebook(guides / "a_intro.ipynb", [v4.new_markdown_cell("# Intro")])
+    run(project, "convert", monkeypatch=monkeypatch)
+    content = project / "docs" / "src" / "content" / "docs" / "guides"
+    assert sorted(p.name for p in content.iterdir()) == ["a-intro.mdx", "b-paths.mdx"]
+    page = (content / "b-paths.mdx").read_text()
+    assert '<NotebookHeader download="/guides/b-paths/b_paths.ipynb" source="guides/drawing/b_paths.ipynb"' in page
+    assert "  order: 2" in page  # sorted by file name across the directories
+
+    # two notebooks that would be the same page
+    write_notebook(guides / "a-intro.ipynb", [])
+    (guides / "a_intro.ipynb").rename(guides / "drawing" / "a_intro.ipynb")
+    with pytest.raises(SystemExit, match="would both be the page a-intro"):
+        run(project, "convert", monkeypatch=monkeypatch)
+
+
+def test_fold_output(project, monkeypatch):
+    v4 = nbformat.v4
+    cells = [
+        v4.new_code_cell(
+            "print(fig)",
+            metadata={"tags": ["hide-input", "fold-output"], "fold_summary": "TikZ <code>"},
+            outputs=[v4.new_output("stream", name="stdout", text="\\begin{tikzpicture}\n")],
+        ),
+        v4.new_code_cell(
+            "print(1)",
+            metadata={"tags": ["fold-output"]},
+            outputs=[v4.new_output("stream", name="stdout", text="1\n")],
+        ),
+        v4.new_code_cell("x = 1", metadata={"tags": ["fold-output"]}),  # no output, no box
+    ]
+    write_notebook(project / "guides" / "folded.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+    page = (project / "docs" / "src" / "content" / "docs" / "guides" / "folded.mdx").read_text()
+    assert "print(fig)" not in page
+    assert "<details>\n<summary>TikZ &lt;code&gt;</summary>\n\n```text\n\\begin{tikzpicture}\n```\n\n</details>" in page
+    assert "```python\nprint(1)\n```\n\n<details>\n<summary>Show output</summary>\n\n```text\n1\n```\n\n</details>" in page
+    assert page.count("<details>") == 2

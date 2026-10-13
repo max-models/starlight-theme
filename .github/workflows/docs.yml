@@ -12,7 +12,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.1.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.2.0
 #       with:
 #         smoke-paths: |
 #           tutorials/shapes-and-node-masks/1.png
