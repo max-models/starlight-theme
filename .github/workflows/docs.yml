@@ -1,0 +1,145 @@
+name: Docs
+
+# The reusable build of a max-models docs site (docs/, Astro + Starlight with this theme):
+# install the project, execute and convert the notebooks, build, smoke test, and deploy to
+# GitHub Pages from one branch. A project calls it from its own .github/workflows/docs.yml:
+#
+#   on:
+#     push: { branches: ["main", "devel"] }
+#     pull_request: { branches: ["main", "devel"] }
+#     workflow_dispatch:
+#   permissions: { contents: read, pages: write, id-token: write }
+#   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
+#   jobs:
+#     docs:
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.1.0
+#       with:
+#         smoke-paths: |
+#           tutorials/shapes-and-node-masks/1.png
+#           api/simgeometry/index.html
+
+on:
+  workflow_call:
+    inputs:
+      project-dir:
+        description: The project root (pyproject.toml and docs/), relative to the repository.
+        type: string
+        default: "."
+      npm-lockfile:
+        description: The npm lockfile, relative to the repository (for the cache).
+        type: string
+        default: docs/package-lock.json
+      python-version:
+        type: string
+        default: "3.12"
+      node-version:
+        type: string
+        default: "22"
+      extras:
+        description: The optional dependencies to install, space separated.
+        type: string
+        default: docs
+      apt-packages:
+        description: System packages, e.g. "libopenmpi-dev openmpi-bin" for notebooks under MPI.
+        type: string
+        default: ""
+      notebooks:
+        description: Execute and convert the notebooks (failing on errors).
+        type: boolean
+        default: true
+      pre-build:
+        description: Shell commands run in the project root after the notebooks, before the build.
+        type: string
+        default: ""
+      smoke-paths:
+        description: Files that must exist in docs/dist, one per line (e.g. "tutorials/index.html").
+        type: string
+        default: ""
+      deploy:
+        description: Deploy to GitHub Pages on a push to deploy-branch.
+        type: boolean
+        default: true
+      deploy-branch:
+        type: string
+        default: devel
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.project-dir }}
+    env:
+      DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ inputs.python-version }}
+          enable-cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.npm-lockfile }}
+
+      - name: Install system packages
+        if: inputs.apt-packages != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }}
+
+      - name: Install the project
+        run: |
+          uv sync $(printf -- '--extra %s ' ${{ inputs.extras }})
+          uv run python -m ipykernel install --user --name python3
+
+      - name: Install the npm packages
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: npm ci
+
+      - name: Execute and convert the notebooks
+        if: inputs.notebooks
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: |
+          npx starlight-notebooks execute
+          npx starlight-notebooks convert --strict
+
+      - name: Project-specific steps
+        if: inputs.pre-build != ''
+        run: ${{ inputs.pre-build }}
+
+      - name: Build the site
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: |
+          npx starlight-check-mdx
+          npx astro build
+
+      - name: Smoke test the built site
+        working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          SMOKE_PATHS: ${{ inputs.smoke-paths }}
+          BASE: /${{ github.event.repository.name }}/
+        run: |
+          missing=0
+          for path in index.html $SMOKE_PATHS; do
+            test -f "dist/$path" || { echo "missing dist/$path"; missing=1; }
+          done
+          grep -q "href=\"$BASE" dist/index.html || { echo "links do not use the base path $BASE"; missing=1; }
+          exit $missing
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ inputs.project-dir }}/docs/dist
+
+  deploy:
+    needs: build
+    if: inputs.deploy && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', inputs.deploy-branch)
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

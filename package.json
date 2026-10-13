@@ -1,0 +1,61 @@
+{
+  "name": "@max-models/starlight-theme",
+  "version": "0.1.0",
+  "description": "The shared Astro + Starlight docs setup of the max-models projects: config, header, palette, notebook pages.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/max-models/starlight-theme.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./content": "./content.ts",
+    "./components/*": "./components/*",
+    "./styles/*": "./styles/*",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "starlight-check-mdx": "bin/check-mdx.mjs",
+    "starlight-notebooks": "bin/notebooks.mjs"
+  },
+  "files": [
+    "index.ts",
+    "content.ts",
+    "virtual.d.ts",
+    "lib",
+    "components",
+    "styles",
+    "utils",
+    "bin",
+    "tools/*.py"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w example/docs",
+    "build": "npm run build -w example/docs",
+    "test": "uv run --with nbformat --with pytest pytest tests"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^7.3.2",
+    "@mdx-js/mdx": "^3.1.1",
+    "katex": "^0.19.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
+    "starlight-links-validator": "^0.27.0",
+    "starlight-pydocs": "0.3.0"
+  },
+  "peerDependencies": {
+    "@astrojs/starlight": ">=0.42.6",
+    "astro": ">=7.3.8"
+  },
+  "workspaces": [
+    "example/docs"
+  ],
+  "devDependencies": {
+    "@astrojs/starlight": "^0.42.6",
+    "astro": "^7.3.8"
+  }
+}

@@ -1,0 +1,33 @@
+---
+title: starlight-theme
+description: The shared docs setup of the max-models projects.
+template: splash
+hero:
+  tagline: One Astro + Starlight setup for the docs of the max-models projects, shown here on a small example package.
+  actions:
+    - text: Get started
+      link: /starlight-theme/getting-started/installation/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/max-models/starlight-theme
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## What the theme brings
+
+<CardGrid>
+  <Card title="Config" icon="setting">`defineDocs` writes the Astro config: base path, math, API reference, link check.</Card>
+  <Card title="Look" icon="star">The paper/ink palette with a teal accent and a header with section links.</Card>
+  <Card title="Notebooks" icon="open-book">`starlight-notebooks` executes notebooks and turns them into pages.</Card>
+</CardGrid>
+
+## Start here
+
+<CardGrid>
+  <LinkCard title="Installation" href="/starlight-theme/getting-started/installation/" description="Use the theme in a project." />
+  <LinkCard title="Tutorials" href="/starlight-theme/tutorials/" description="A converted notebook." />
+  <LinkCard title="API reference" href="/starlight-theme/api/example_pkg/" description="Generated from the docstrings." />
+</CardGrid>
