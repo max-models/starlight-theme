@@ -12,6 +12,7 @@ export default defineDocs({
 	nav: [
 		{ label: 'Getting started', link: '/getting-started/installation/' },
 		{ label: 'Tutorials', link: '/tutorials/' },
+		{ label: 'Gallery', link: '/examples/' },
 		{ label: 'Development', link: '/development/docs/' },
 		{ label: 'API', link: '/api/example_pkg/', section: '/api/' },
 	],
@@ -25,10 +26,20 @@ export default defineDocs({
 			items: [{ autogenerate: { directory: 'tutorials' } }],
 		},
 		{
+			label: 'Gallery',
+			items: [{ autogenerate: { directory: 'examples' } }],
+		},
+		{
 			label: 'Development',
-			items: [{ label: 'Building the docs', slug: 'development/docs' }],
+			items: [
+				{ label: 'Building the docs', slug: 'development/docs' },
+				{ label: 'Writing gallery examples', slug: 'development/gallery' },
+			],
 		},
 	],
+	astro: {
+		redirects: { '/guides/': '/tutorials/' },
+	},
 	starlight: {
 		editLink: { baseUrl: 'https://github.com/max-models/starlight-theme/edit/devel/example/docs/' },
 	},

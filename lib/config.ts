@@ -43,7 +43,10 @@ export interface DocsOptions {
 	inventories?: PydocsUserConfig['inventories'];
 	/** Merged over the Starlight config (plugins are appended to the theme's). */
 	starlight?: Partial<StarlightUserConfig>;
-	/** Merged over the Astro config (e.g. `redirects`). */
+	/**
+	 * Merged over the Astro config, e.g. `redirects: { '/tutorials/': '/guides/' }` (site-root paths;
+	 * the base path is added to the targets, which Astro does not do).
+	 */
 	astro?: AstroUserConfig;
 }
 
@@ -97,6 +100,15 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 
 	const { plugins: extraPlugins = [], ...starlightOverrides } = options.starlight ?? {};
 
+	// Astro adds the base path to a redirect's source but not to its target
+	const withBase = (path: string) => (path.startsWith('/') && !path.startsWith(`${base}/`) ? `${base}${path}` : path);
+	const redirects = Object.fromEntries(
+		Object.entries(options.astro?.redirects ?? {}).map(([from, to]) => [
+			from,
+			typeof to === 'string' ? withBase(to) : { ...to, destination: withBase(to.destination) },
+		])
+	);
+
 	return {
 		site: `https://${owner}.github.io`,
 		base,
@@ -105,6 +117,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			processor: unified({ remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }),
 		},
 		...options.astro,
+		redirects,
 		integrations: [
 			starlight({
 				title: options.title,

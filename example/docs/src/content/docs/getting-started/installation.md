@@ -6,7 +6,7 @@ description: Use the theme in a project's docs.
 In the project's `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.1.0
+npm install github:max-models/starlight-theme#v0.2.0
 ```
 
 `docs/astro.config.mjs` then only holds what is particular to the project:
