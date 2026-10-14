@@ -25,7 +25,9 @@ for sign, x0 in [(+1.0, -a), (-1.0, a)]:
 
 speed = np.hypot(u, v)
 fig, ax = plt.subplots(figsize=(8, 6))
-lines = ax.streamplot(x, y, u, v, color=np.minimum(speed, 3.0), cmap="viridis", density=1.8, linewidth=1.2)
+lines = ax.streamplot(
+    x, y, u, v, color=np.minimum(speed, 3.0), cmap="viridis", density=1.8, linewidth=1.2
+)
 fig.colorbar(lines.lines, ax=ax, label="speed")
 ax.plot([-a, a], [0, 0], "o", color="crimson")
 ax.set(xlabel="x", ylabel="y", title="Counter-rotating vortex pair", aspect="equal")

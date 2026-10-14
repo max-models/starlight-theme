@@ -18,7 +18,9 @@ def displacement(zeta: float) -> np.ndarray:
     """x(t) for x(0) = 1, x'(0) = 0."""
     if zeta < 1.0:
         wd = omega0 * np.sqrt(1.0 - zeta**2)
-        return np.exp(-zeta * omega0 * t) * (np.cos(wd * t) + zeta * omega0 / wd * np.sin(wd * t))
+        return np.exp(-zeta * omega0 * t) * (
+            np.cos(wd * t) + zeta * omega0 / wd * np.sin(wd * t)
+        )
     if zeta == 1.0:
         return np.exp(-omega0 * t) * (1.0 + omega0 * t)
     root = omega0 * np.sqrt(zeta**2 - 1.0)

@@ -35,7 +35,12 @@ fig = go.Figure(
         y=path[:, 1],
         z=path[:, 2],
         mode="lines",
-        line={"color": np.arange(steps) * dt, "colorscale": "Viridis", "width": 3, "colorbar": {"title": "t"}},
+        line={
+            "color": np.arange(steps) * dt,
+            "colorscale": "Viridis",
+            "width": 3,
+            "colorbar": {"title": "t"},
+        },
     )
 )
 fig.update_layout(title="Lorenz attractor", height=560, scene={"aspectmode": "data"})

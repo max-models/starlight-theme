@@ -52,13 +52,19 @@ def project(tmp_path: Path) -> gallery.GallerySettings:
     source = tmp_path / "examples"
     (source / "group_one").mkdir(parents=True)
     (source / "group_one" / "first_example.py").write_text(SCRIPT)
-    (source / "second.py").write_text('"""Second"""\nimport matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()\n')
+    (source / "second.py").write_text(
+        '"""Second"""\nimport matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()\n'
+    )
     (source / "_helper.py").write_text("")
-    return gallery.GallerySettings(docs=docs, source=source, section="examples", mpi_ranks=1)
+    return gallery.GallerySettings(
+        docs=docs, source=source, section="examples", mpi_ranks=1
+    )
 
 
 def test_parse_example_splits_the_docstring(project):
-    example = gallery.parse_example(project, project.source / "group_one" / "first_example.py")
+    example = gallery.parse_example(
+        project, project.source / "group_one" / "first_example.py"
+    )
     assert example.title == "A tidy title"
     assert example.group == "Group one"
     assert example.summary.startswith("The summary of the card")
@@ -82,7 +88,8 @@ def test_runner_collects_figures_and_output(tmp_path):
     pytest.importorskip("matplotlib")
     script = tmp_path / "script.py"
     script.write_text(
-        SCRIPT + "import matplotlib.pyplot as plt\nplt.plot([1, 2])\n"  # left open, no show()
+        SCRIPT
+        + "import matplotlib.pyplot as plt\nplt.plot([1, 2])\n"  # left open, no show()
     )
     outdir = tmp_path / "out"
     result = subprocess.run(
@@ -95,14 +102,22 @@ def test_runner_collects_figures_and_output(tmp_path):
     assert [f["kind"] for f in manifest["figures"]] == ["plotly", "png"]
     assert manifest["stdout"] == "hello\n"
     assert (outdir / "fig-2.png").read_bytes().startswith(b"\x89PNG")
-    assert json.loads((outdir / "fig-1.plotly.json").read_text())["data"][0]["y"] == [3, 4]
+    assert json.loads((outdir / "fig-1.plotly.json").read_text())["data"][0]["y"] == [
+        3,
+        4,
+    ]
 
 
 def test_runner_fails_without_a_figure(tmp_path):
     script = tmp_path / "script.py"
     script.write_text("x = 1\n")
     result = subprocess.run(
-        [sys.executable, str(TOOLS / "gallery_runner.py"), str(script), str(tmp_path / "out")],
+        [
+            sys.executable,
+            str(TOOLS / "gallery_runner.py"),
+            str(script),
+            str(tmp_path / "out"),
+        ],
         capture_output=True,
         text=True,
     )
@@ -112,14 +127,23 @@ def test_runner_fails_without_a_figure(tmp_path):
 
 def test_convert_writes_pages_and_index(project):
     # a cached run of the first example
-    example = gallery.parse_example(project, project.source / "group_one" / "first_example.py")
+    example = gallery.parse_example(
+        project, project.source / "group_one" / "first_example.py"
+    )
     outdir = project.cache / example.slug
     outdir.mkdir(parents=True)
     (outdir / "fig-1.plotly.json").write_text('{"data": [], "layout": {}}')
     (outdir / "manifest.json").write_text(
-        json.dumps({"figures": [{"kind": "plotly", "file": "fig-1.plotly.json"}], "stdout": "hello\n"})
+        json.dumps(
+            {
+                "figures": [{"kind": "plotly", "file": "fig-1.plotly.json"}],
+                "stdout": "hello\n",
+            }
+        )
     )
-    (project.cache / f"{example.slug}.key").write_text(gallery.script_hash(example.path))
+    (project.cache / f"{example.slug}.key").write_text(
+        gallery.script_hash(example.path)
+    )
 
     with pytest.raises(SystemExit):  # the second example was not run
         gallery.cmd_convert(project, Namespace(strict=True))

@@ -19,6 +19,10 @@ harmonics = {f"sin({n}x) / {n}": np.sin(n * x) / n for n in (1, 2, 3)}
 fig = go.Figure()
 for name, y in harmonics.items():
     fig.add_scatter(x=x, y=y, name=name, mode="lines", line={"width": 2})
-fig.add_scatter(x=x, y=sum(harmonics.values()), name="sum", mode="lines", line={"width": 4})
-fig.update_layout(title="Harmonics of a sawtooth wave", xaxis_title="x", yaxis_title="f(x)")
+fig.add_scatter(
+    x=x, y=sum(harmonics.values()), name="sum", mode="lines", line={"width": 4}
+)
+fig.update_layout(
+    title="Harmonics of a sawtooth wave", xaxis_title="x", yaxis_title="f(x)"
+)
 fig.show()

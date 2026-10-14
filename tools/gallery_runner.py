@@ -99,7 +99,10 @@ def main(script: Path, outdir: Path) -> int:
         json.dumps({"figures": collector.figures, "stdout": printed.getvalue()})
     )
     if status == 0 and not collector.figures:
-        print("the script showed no figure: call plt.show() or fig.show()", file=sys.stderr)
+        print(
+            "the script showed no figure: call plt.show() or fig.show()",
+            file=sys.stderr,
+        )
         status = 1
     return status
 

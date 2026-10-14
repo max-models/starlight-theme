@@ -226,9 +226,7 @@ def _figures(settings: GallerySettings, example: Example) -> list[dict[str, str]
     return json.loads(manifest.read_text())["figures"]
 
 
-def convert_example(
-    settings: GallerySettings, example: Example, order: int
-) -> dict:
+def convert_example(settings: GallerySettings, example: Example, order: int) -> dict:
     """Write the page and the assets of one script; return its card for the grid."""
     outdir = settings.cache / example.slug
     figures = _figures(settings, example)
@@ -253,7 +251,7 @@ def convert_example(
         if asset["kind"] == "plotly":
             parts.append(f'<PlotlyFigure src="{asset["src"]}" />')
         else:
-            parts.append(f"<NotebookImage src=\"{asset['src']}\" alt={{{alt}}} />")
+            parts.append(f'<NotebookImage src="{asset["src"]}" alt={{{alt}}} />')
     parts.append("## Source code")
     parts.append(_code_fence(example.code, example.path.name))
     if stdout.strip():
@@ -262,7 +260,9 @@ def convert_example(
             + nb_tool._fence(stdout)
             + "\n\n</details>"
         )
-    imports = ["GalleryHeader"] + (["PlotlyFigure"] if any(a["kind"] == "plotly" for a in assets) else [])
+    imports = ["GalleryHeader"] + (
+        ["PlotlyFigure"] if any(a["kind"] == "plotly" for a in assets) else []
+    )
     if any(a["kind"] == "png" for a in assets):
         imports.append("NotebookImage")
     frontmatter = [
@@ -282,7 +282,8 @@ def convert_example(
         "\n".join(frontmatter)
         + "\n\n"
         + "\n".join(
-            f"import {name} from '{PACKAGE}/components/{name}.astro';" for name in imports
+            f"import {name} from '{PACKAGE}/components/{name}.astro';"
+            for name in imports
         )
         + "\n\n"
         + header
@@ -342,11 +343,15 @@ def cmd_convert(settings: GallerySettings, args: argparse.Namespace) -> None:
         card = convert_example(settings, example, order)
         cards.append(card)
         if error_file.exists():
-            problems.append(f"{example.slug}: run failed: {error_file.read_text().strip()}")
+            problems.append(
+                f"{example.slug}: run failed: {error_file.read_text().strip()}"
+            )
         elif card["thumbnail"] is None:
             problems.append(f"{example.slug}: not run or source changed")
         state = "run" if card["thumbnail"] else "not run"
-        print(f"[gallery] {example.slug}: {state} -> {settings.section}/{example.slug}.mdx")
+        print(
+            f"[gallery] {example.slug}: {state} -> {settings.section}/{example.slug}.mdx"
+        )
     write_index(settings, cards)
     for problem in problems:
         print(f"[gallery] warning: {problem}")

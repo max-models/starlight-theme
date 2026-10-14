@@ -24,7 +24,14 @@ def u(t: float) -> np.ndarray:
 
 frames = [go.Frame(data=[go.Scatter(x=x, y=u(t))], name=f"{t:.1f}") for t in times]
 steps = [
-    {"label": f.name, "method": "animate", "args": [[f.name], {"mode": "immediate", "frame": {"duration": 0, "redraw": False}}]}
+    {
+        "label": f.name,
+        "method": "animate",
+        "args": [
+            [f.name],
+            {"mode": "immediate", "frame": {"duration": 0, "redraw": False}},
+        ],
+    }
     for f in frames
 ]
 fig = go.Figure(
@@ -42,12 +49,37 @@ fig = go.Figure(
                 "x": 0.0,
                 "y": -0.3,
                 "buttons": [
-                    {"label": "Play", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": False}, "fromcurrent": True}]},
-                    {"label": "Pause", "method": "animate", "args": [[None], {"mode": "immediate", "frame": {"duration": 0}}]},
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 80, "redraw": False},
+                                "fromcurrent": True,
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {"mode": "immediate", "frame": {"duration": 0}},
+                        ],
+                    },
                 ],
             }
         ],
-        "sliders": [{"steps": steps, "y": -0.3, "x": 0.15, "len": 0.85, "currentvalue": {"prefix": "t = "}}],
+        "sliders": [
+            {
+                "steps": steps,
+                "y": -0.3,
+                "x": 0.15,
+                "len": 0.85,
+                "currentvalue": {"prefix": "t = "},
+            }
+        ],
     },
 )
 fig.show()

@@ -115,7 +115,9 @@ Three harmonics of a fundamental wave, and their sum.   <- the text of the card
 
 More Markdown, with $math$, goes on the page above the figure.
 """
+
 import plotly.graph_objects as go
+
 ...
 fig.show()
 ```

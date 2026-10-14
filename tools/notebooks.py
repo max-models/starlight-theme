@@ -104,7 +104,9 @@ def load_settings(args: argparse.Namespace) -> Settings:
     source = (docs / (args.source or config.get("source", "../tutorials"))).resolve()
     if not source.is_dir():
         sys.exit(f"[notebooks] no notebook directory {source}")
-    ranks = args.mpi_ranks or os.environ.get("DOCS_MPI_RANKS") or config.get("mpiRanks", 1)
+    ranks = (
+        args.mpi_ranks or os.environ.get("DOCS_MPI_RANKS") or config.get("mpiRanks", 1)
+    )
     return Settings(
         docs=docs,
         source=source,
@@ -122,13 +124,17 @@ def notebooks(settings: Settings) -> list[Path]:
         path
         for path in settings.source.rglob("*.ipynb")
         # .ipynb_checkpoints and other hidden directories
-        if not any(part.startswith(".") for part in path.relative_to(settings.source).parts)
+        if not any(
+            part.startswith(".") for part in path.relative_to(settings.source).parts
+        )
     ]
     seen: dict[str, Path] = {}
     for path in paths:
         other = seen.setdefault(slug_of(path), path)
         if other != path:
-            sys.exit(f"[notebooks] {other} and {path} would both be the page {slug_of(path)}")
+            sys.exit(
+                f"[notebooks] {other} and {path} would both be the page {slug_of(path)}"
+            )
     return sorted(paths, key=lambda path: (path.stem != "index", path.name))
 
 
@@ -223,9 +229,7 @@ def cmd_execute(settings: Settings, args: argparse.Namespace) -> None:
         if _mpi_launcher() is not None:
             print(f"[notebooks] running under mpiexec -n {settings.mpi_ranks}")
         else:
-            print(
-                "[notebooks] mpi4py or mpiexec/mpirun not found; running on 1 rank"
-            )
+            print("[notebooks] mpi4py or mpiexec/mpirun not found; running on 1 rank")
     failed = []
     for path in notebooks(settings):
         slug = slug_of(path)
@@ -496,7 +500,9 @@ def convert_notebook(
                 if (converted := convert_output(output, page, tags, index))
             ]
             if outputs and "fold-output" in tags:
-                summary = _escape_plain(cell.metadata.get("fold_summary", "Show output"))
+                summary = _escape_plain(
+                    cell.metadata.get("fold_summary", "Show output")
+                )
                 outputs = [
                     f"<details>\n<summary>{summary}</summary>\n\n"
                     + "\n\n".join(outputs)

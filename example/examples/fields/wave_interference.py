@@ -26,7 +26,9 @@ for sx, sy in sources:
     r = np.maximum(np.hypot(X - sx, Y - sy), 0.2)
     u += np.cos(k * r) / np.sqrt(r)
 
-fig = go.Figure(go.Heatmap(x=x, y=y, z=u, colorscale="RdBu", zmid=0.0, colorbar={"title": "u"}))
+fig = go.Figure(
+    go.Heatmap(x=x, y=y, z=u, colorscale="RdBu", zmid=0.0, colorbar={"title": "u"})
+)
 fig.add_scatter(
     x=[s[0] for s in sources],
     y=[s[1] for s in sources],
@@ -34,5 +36,11 @@ fig.add_scatter(
     marker={"size": 10, "color": "black", "line": {"color": "white", "width": 2}},
     name="sources",
 )
-fig.update_layout(title="Two-source interference", xaxis_title="x", yaxis_title="y", yaxis_scaleanchor="x", height=520)
+fig.update_layout(
+    title="Two-source interference",
+    xaxis_title="x",
+    yaxis_title="y",
+    yaxis_scaleanchor="x",
+    height=520,
+)
 fig.show()
