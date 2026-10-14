@@ -8,3 +8,5 @@ __pycache__/
 example/docs/public/tutorials/
 example/docs/src/content/docs/tutorials/*.mdx
 .venv/
+example/docs/public/examples/
+example/docs/src/content/docs/examples/*.mdx

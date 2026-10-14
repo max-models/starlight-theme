@@ -9,8 +9,9 @@ when it bumps its version.
 |---|---|
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math, the theme, the API reference (starlight-pydocs), the link check, edit and GitHub links |
 | `theme()` Starlight plugin | The palette, a header with a row of section links, the KaTeX styles. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`: what the converted notebook pages use |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
+| `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
 | `.github/workflows/docs.yml` | The reusable CI: install, notebooks, build, smoke test, deploy to GitHub Pages |
 
@@ -100,6 +101,43 @@ installed (`DOCS_MPI_RANKS=1` for a quick serial run). The cell tags `remove-cel
 `remove-output`, `raises-exception` and nbclient's `skip-execution` are honoured, and notebook
 metadata `docs_order` sets the sidebar position. See the docstring of `tools/notebooks.py` for the rest.
 
+### Gallery
+
+`starlight-gallery <execute|convert|clean>` builds a gallery from plain Python scripts in `examples/`
+(or another directory): a grid of cards with thumbnails, and a page per script with its description,
+the figures and the code. It runs in the same Python as the notebooks, plus whatever the scripts
+import (matplotlib, plotly, ...).
+
+```python
+"""Sine waves
+
+Three harmonics of a fundamental wave, and their sum.   <- the text of the card
+
+More Markdown, with $math$, goes on the page above the figure.
+"""
+import plotly.graph_objects as go
+...
+fig.show()
+```
+
+The first docstring line is the title, the first paragraph after it the text of the card, the rest the
+page text. A script shows its figures the usual way, so it also runs on its own: `fig.show()` for
+Plotly (an interactive plotly.js figure, with the site's light/dark colours, animations included) and
+`plt.show()` for matplotlib (a PNG); every figure a script shows is on its page, and a script that
+shows none fails. Below the figures the page has the code without the docstring, a download link, and
+what the script printed. Scripts in subdirectories are grouped under a heading per directory (the
+pages are named after the scripts alone); `README.md` in the directory is the introduction of the
+gallery page. Settings, in `docs/package.json`:
+
+```json
+"starlight-gallery": { "source": "../examples", "section": "examples", "title": "Gallery" }
+```
+
+Add `starlight-gallery convert` after `starlight-notebooks convert` in the `dev` and `build` scripts, a
+`{ autogenerate: { directory: 'examples' } }` sidebar entry and a nav link, and call the CI with
+`gallery: true` to run the scripts there. Locally, `starlight-gallery execute` runs the scripts that
+changed (`--force` all of them).
+
 The Makefile targets become:
 
 ```make
@@ -141,7 +179,7 @@ jobs:
 ```
 
 Inputs: `extras` (default `docs`; e.g. `docs mpi`), `apt-packages` (e.g.
-`libopenmpi-dev openmpi-bin`), `notebooks`, `pre-build` (shell commands before the build, e.g.
+`libopenmpi-dev openmpi-bin`), `notebooks`, `gallery`, `pre-build` (shell commands before the build, e.g.
 tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`),
 `python-version`, `node-version`, `project-dir`, `npm-lockfile`.
 

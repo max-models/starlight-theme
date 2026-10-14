@@ -1,0 +1,55 @@
+---
+// The strip at the top of a gallery page: download the script and open it on GitHub
+// (written by the starlight-gallery tool).
+import theme from 'virtual:starlight-theme/config';
+import { withBase } from '../utils/base';
+
+export interface Props {
+	/** Site-root path of the downloadable script under public/, e.g. "/gallery/sine-waves/sine_waves.py". */
+	download: string;
+	/** Repository path of the script, e.g. "examples/basics/sine_waves.py". */
+	source: string;
+	/** "run" (figures from a run at build time) or "not run". */
+	status?: 'run' | 'not run';
+}
+const { download, source, status = 'run' } = Astro.props;
+const filename = download.split('/').at(-1) ?? 'example.py';
+const github = `https://github.com/${theme.repository}/blob/${theme.branch}/${source}`;
+const notes = {
+	run: 'Run when the site was built.',
+	'not run': 'Not run for this build: the figures are missing.',
+};
+---
+
+<div class="gallery-header not-content">
+	<a class="gallery-button" href={withBase(download)} download={filename}>Download script</a>
+	<a class="gallery-button secondary" href={github}>View on GitHub</a>
+	<span class="gallery-note">{notes[status]}</span>
+</div>
+
+<style>
+	.gallery-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem 0.8rem;
+		margin-block: 0 1.5rem;
+		font-size: var(--sl-text-sm);
+	}
+	.gallery-button {
+		padding: 0.35rem 0.9rem;
+		border: 1px solid var(--sl-color-text-accent);
+		border-radius: 999px;
+		background: var(--sl-color-text-accent);
+		color: var(--sl-color-text-invert);
+		text-decoration: none;
+		font-weight: 600;
+	}
+	.gallery-button.secondary {
+		background: transparent;
+		color: var(--sl-color-text-accent);
+	}
+	.gallery-note {
+		color: var(--sl-color-gray-3);
+	}
+</style>

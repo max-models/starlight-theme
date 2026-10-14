@@ -1,0 +1,161 @@
+---
+// An interactive Plotly figure, loaded from the JSON a gallery script's `fig.show()` left under
+// public/ (written by the starlight-gallery tool). plotly.js is a separate chunk that is fetched
+// only when a figure scrolls into view, and the figure follows the site's light/dark theme.
+import { withBase } from '../utils/base';
+
+export interface Props {
+	/** Site-root path of the figure JSON, e.g. "/gallery/sine-waves/fig-1.plotly.json". */
+	src: string;
+	/** A small, static preview without legend, titles and tick labels (the cards of the gallery). */
+	thumbnail?: boolean;
+}
+const { src, thumbnail = false } = Astro.props;
+---
+
+<div class:list={['plotly-figure', { thumbnail }]} data-plotly={withBase(src)} data-thumbnail={thumbnail ? '' : undefined}>
+	<span class="plotly-status" aria-live="polite">Loading figure…</span>
+</div>
+
+<script>
+	type Layout = Record<string, any>;
+
+	const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+	// Colours of the current theme, applied over whatever template the script's figure used.
+	function themeLayout(layout: Layout): Layout {
+		const text = css('--sl-color-text');
+		const grid = css('--sl-color-hairline');
+		const axis = { gridcolor: grid, zerolinecolor: css('--sl-color-hairline-light'), linecolor: css('--sl-color-hairline-light'), tickcolor: css('--sl-color-hairline-light') };
+		const update: Layout = {
+			paper_bgcolor: 'rgba(0,0,0,0)',
+			plot_bgcolor: 'rgba(0,0,0,0)',
+			'font.color': text,
+			'font.family': css('--sl-font') || 'system-ui, sans-serif',
+			'legend.bgcolor': 'rgba(0,0,0,0)',
+		};
+		const axisKey = /^[xyz]axis\d*$|^(polar|ternary|geo)\d*$/;
+		for (const key of Object.keys(layout)) {
+			if (axisKey.test(key)) {
+				for (const [name, value] of Object.entries(axis)) update[`${key}.${name}`] = value;
+			}
+			if (/^scene\d*$/.test(key)) {
+				for (const dim of ['xaxis', 'yaxis', 'zaxis']) {
+					for (const [name, value] of Object.entries(axis)) update[`${key}.${dim}.${name}`] = value;
+					update[`${key}.${dim}.backgroundcolor`] = 'rgba(0,0,0,0)';
+				}
+			}
+		}
+		for (const key of ['xaxis', 'yaxis']) for (const [name, value] of Object.entries(axis)) update[`${key}.${name}`] ??= value;
+		return update;
+	}
+
+	function thumbnailLayout(layout: Layout): Layout {
+		const update: Layout = {
+			title: null,
+			showlegend: false,
+			autosize: true,
+			height: null,
+			width: null,
+			margin: { l: 12, r: 12, t: 12, b: 12 },
+			updatemenus: [],
+			sliders: [],
+		};
+		for (const key of Object.keys(layout)) {
+			if (/^[xy]axis\d*$/.test(key)) Object.assign(update, { [`${key}.showticklabels`]: false, [`${key}.title`]: null });
+			if (/^scene\d*$/.test(key)) for (const dim of ['xaxis', 'yaxis', 'zaxis']) update[`${key}.${dim}.visible`] = false;
+		}
+		for (const key of ['xaxis', 'yaxis']) update[`${key}.showticklabels`] = false;
+		return update;
+	}
+
+	// Plotly's relayout takes dotted paths; the initial layout takes nested objects.
+	function expand(flat: Layout): Layout {
+		const out: Layout = {};
+		for (const [path, value] of Object.entries(flat)) {
+			const keys = path.split('.');
+			let node = out;
+			for (const key of keys.slice(0, -1)) node = node[key] ??= {};
+			node[keys.at(-1)!] = value;
+		}
+		return out;
+	}
+	function merge(target: Layout, source: Layout): Layout {
+		for (const [key, value] of Object.entries(source)) {
+			if (value && typeof value === 'object' && !Array.isArray(value) && target[key] && typeof target[key] === 'object') merge(target[key], value);
+			else target[key] = value;
+		}
+		return target;
+	}
+
+	const rendered: { element: HTMLElement; layout: Layout; Plotly: any }[] = [];
+
+	async function render(element: HTMLElement) {
+		const thumbnail = element.hasAttribute('data-thumbnail');
+		try {
+			const [response, module] = await Promise.all([
+				fetch(element.dataset.plotly!),
+				// @ts-ignore: plotly.js ships no types
+				import('plotly.js-dist-min'),
+			]);
+			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+			const figure = await response.json();
+			const Plotly = module.default ?? module;
+			const layout: Layout = figure.layout ?? {};
+			if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
+			merge(layout, expand(themeLayout(layout)));
+			element.replaceChildren();
+			await Plotly.newPlot(element, { data: figure.data, layout, frames: thumbnail ? [] : figure.frames }, {
+				responsive: true,
+				displaylogo: false,
+				staticPlot: thumbnail,
+			});
+			rendered.push({ element, layout, Plotly });
+		} catch (error) {
+			element.textContent = `Could not load the figure (${(error as Error).message}).`;
+		}
+	}
+
+	const observer = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) continue;
+				observer.unobserve(entry.target);
+				render(entry.target as HTMLElement);
+			}
+		},
+		{ rootMargin: '300px' }
+	);
+	document.querySelectorAll<HTMLElement>('[data-plotly]').forEach((element) => observer.observe(element));
+
+	// the theme toggle sets data-theme on <html>
+	new MutationObserver(() => {
+		for (const { element, layout, Plotly } of rendered) Plotly.relayout(element, themeLayout(layout));
+	}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
+
+<style>
+	.plotly-figure {
+		min-height: 24rem;
+		margin-block: 1.25rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.75rem;
+		padding: 0.5rem;
+		background: color-mix(in srgb, var(--sl-color-gray-5, #888) 8%, transparent);
+	}
+	.plotly-figure.thumbnail {
+		min-height: 0;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		border: 0;
+		border-radius: 0;
+		padding: 0;
+		background: none;
+		pointer-events: none;
+	}
+	.plotly-status {
+		color: var(--sl-color-gray-3);
+		font-size: var(--sl-text-sm);
+	}
+</style>

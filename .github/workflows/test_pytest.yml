@@ -31,4 +31,4 @@ jobs:
           enable-cache: true
 
       - name: Run the tests
-        run: uv run --with nbformat --with pytest pytest tests
+        run: uv run --with nbformat --with matplotlib --with plotly --with pytest pytest tests
