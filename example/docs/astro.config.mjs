@@ -29,6 +29,9 @@ export default defineDocs({
 			items: [{ label: 'Building the docs', slug: 'development/docs' }],
 		},
 	],
+	astro: {
+		redirects: { '/guides/': '/tutorials/' },
+	},
 	starlight: {
 		editLink: { baseUrl: 'https://github.com/max-models/starlight-theme/edit/devel/example/docs/' },
 	},

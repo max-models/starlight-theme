@@ -65,7 +65,8 @@ export default defineDocs({
 Other options: `owner` (default `max-models`), `branch` (default `devel`), `pydocs` (overrides
 for the starlight-pydocs package entry), `inventories` (default Python and NumPy), and
 `starlight` / `astro` for anything else, merged over the result, e.g.
-`astro: { redirects: { '/tutorials/': '/guides/' } }` or `starlight: { plugins: [...] }`.
+`astro: { redirects: { '/tutorials/': '/guides/' } }` (site-root paths; `defineDocs` adds the base
+path to the targets, which Astro does not) or `starlight: { plugins: [...] }`.
 A nav link is "current" on every page under its first path segment, or under `section`.
 
 `docs/src/content.config.ts`:

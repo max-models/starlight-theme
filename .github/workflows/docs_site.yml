@@ -33,3 +33,4 @@ jobs:
         tutorials/first-steps/1.png
         tutorials/first-steps/first_steps.ipynb
         api/example_pkg/index.html
+        guides/index.html
