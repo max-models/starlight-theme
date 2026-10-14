@@ -12,7 +12,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.1.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.2.0
 #       with:
 #         smoke-paths: |
 #           tutorials/shapes-and-node-masks/1.png
@@ -47,6 +47,10 @@ on:
         description: Execute and convert the notebooks (failing on errors).
         type: boolean
         default: true
+      gallery:
+        description: Run the example scripts and convert them into the gallery (failing on errors).
+        type: boolean
+        default: false
       pre-build:
         description: Shell commands run in the project root after the notebooks, before the build.
         type: string
@@ -105,6 +109,13 @@ jobs:
         run: |
           npx starlight-notebooks execute
           npx starlight-notebooks convert --strict
+
+      - name: Run and convert the gallery examples
+        if: inputs.gallery
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: |
+          npx starlight-gallery execute
+          npx starlight-gallery convert --strict
 
       - name: Project-specific steps
         if: inputs.pre-build != ''

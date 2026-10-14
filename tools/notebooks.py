@@ -17,13 +17,17 @@ Settings, from the ``"starlight-notebooks"`` entry of ``docs/package.json`` (pat
 
     "starlight-notebooks": { "source": "../guides", "mpiRanks": 4 }
 
-``source``    the notebook directory (default ``../tutorials``)
+``source``    the notebook directory (default ``../tutorials``); notebooks in its subdirectories
+              are included too, with pages named after the notebook alone (the slugs must be
+              unique), so the directories only organise the sources
 ``section``   the URL and content directory of the pages (default: the name of ``source``)
 ``mpiRanks``  MPI ranks per notebook (default 1; ``DOCS_MPI_RANKS`` overrides it, e.g.
               ``DOCS_MPI_RANKS=1`` for a quick serial run)
 
 Cell tags: ``remove-cell``, ``hide-input``, ``fold-input`` (code in a closed <details>),
-``remove-output``, ``raises-exception``. Notebook metadata ``docs_order`` sets the sidebar order
+``fold-output`` (the outputs in a closed <details>, titled by the cell metadata ``fold_summary``,
+default "Show output"), ``remove-output``, ``raises-exception``, and nbclient's
+``skip-execution`` (shown, not run). Notebook metadata ``docs_order`` sets the sidebar order
 (else ``index`` first, then by file name).
 
 Usage: starlight-notebooks <execute|convert|clean> [options]   (in docs/, or with --docs)
@@ -100,7 +104,9 @@ def load_settings(args: argparse.Namespace) -> Settings:
     source = (docs / (args.source or config.get("source", "../tutorials"))).resolve()
     if not source.is_dir():
         sys.exit(f"[notebooks] no notebook directory {source}")
-    ranks = args.mpi_ranks or os.environ.get("DOCS_MPI_RANKS") or config.get("mpiRanks", 1)
+    ranks = (
+        args.mpi_ranks or os.environ.get("DOCS_MPI_RANKS") or config.get("mpiRanks", 1)
+    )
     return Settings(
         docs=docs,
         source=source,
@@ -114,10 +120,22 @@ def slug_of(path: Path) -> str:
 
 
 def notebooks(settings: Settings) -> list[Path]:
-    return sorted(
-        settings.source.glob("*.ipynb"),
-        key=lambda path: (path.stem != "index", path.name),
-    )
+    paths = [
+        path
+        for path in settings.source.rglob("*.ipynb")
+        # .ipynb_checkpoints and other hidden directories
+        if not any(
+            part.startswith(".") for part in path.relative_to(settings.source).parts
+        )
+    ]
+    seen: dict[str, Path] = {}
+    for path in paths:
+        other = seen.setdefault(slug_of(path), path)
+        if other != path:
+            sys.exit(
+                f"[notebooks] {other} and {path} would both be the page {slug_of(path)}"
+            )
+    return sorted(paths, key=lambda path: (path.stem != "index", path.name))
 
 
 # Execution ------------------------------------------------------------------------------- #
@@ -211,9 +229,7 @@ def cmd_execute(settings: Settings, args: argparse.Namespace) -> None:
         if _mpi_launcher() is not None:
             print(f"[notebooks] running under mpiexec -n {settings.mpi_ranks}")
         else:
-            print(
-                "[notebooks] mpi4py or mpiexec/mpirun not found; running on 1 rank"
-            )
+            print("[notebooks] mpi4py or mpiexec/mpirun not found; running on 1 rank")
     failed = []
     for path in notebooks(settings):
         slug = slug_of(path)
@@ -478,10 +494,21 @@ def convert_notebook(
                 body.append(code)
             if "remove-output" in tags:
                 continue
-            for output in merge_streams(cell.get("outputs", [])):
-                converted = convert_output(output, page, tags, index)
-                if converted:
-                    body.append(converted)
+            outputs = [
+                converted
+                for output in merge_streams(cell.get("outputs", []))
+                if (converted := convert_output(output, page, tags, index))
+            ]
+            if outputs and "fold-output" in tags:
+                summary = _escape_plain(
+                    cell.metadata.get("fold_summary", "Show output")
+                )
+                outputs = [
+                    f"<details>\n<summary>{summary}</summary>\n\n"
+                    + "\n\n".join(outputs)
+                    + "\n\n</details>"
+                ]
+            body += outputs
     title = title or source.stem.replace("_", " ").capitalize()
     imports = [
         f"import {name} from '{PACKAGE}/components/{name}.astro';"

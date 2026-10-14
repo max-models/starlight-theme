@@ -1,0 +1,42 @@
+name: Docs
+
+# The example site in example/, built with the reusable docs.yml exactly as the projects use it,
+# on every push and pull request; deployed to https://max-models.github.io/starlight-theme/
+# from devel. (docs.yml itself keeps its name: projects call it by that path.)
+
+on:
+  push:
+    branches: ["main", "devel"]
+  pull_request:
+    branches: ["main", "devel"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    uses: ./.github/workflows/docs.yml
+    with:
+      project-dir: example
+      npm-lockfile: package-lock.json
+      gallery: true
+      smoke-paths: |
+        getting-started/installation/index.html
+        tutorials/index.html
+        tutorials/first-steps/index.html
+        tutorials/first-steps/1.png
+        tutorials/first-steps/first_steps.ipynb
+        api/example_pkg/index.html
+        guides/index.html
+        examples/index.html
+        examples/sine-waves/index.html
+        examples/sine-waves/fig-1.plotly.json
+        examples/damped-oscillator/fig-1.png
+        examples/sine-waves/sine_waves.py
