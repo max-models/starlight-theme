@@ -12,7 +12,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.3.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.3.1
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -192,37 +192,78 @@ jobs:
           exit $missing
 
       - uses: actions/upload-artifact@v7
-        if: needs.plan.outputs.deploy == 'true'
         with:
           name: site-${{ matrix.name }}
           path: ${{ inputs.project-dir }}/docs/dist
           retention-days: 1
 
-  deploy:
+  # Assemble the pages from the builds and check them, on pull requests too, so a broken
+  # assembly fails before anything is deployed.
+  assemble:
     needs: [plan, build]
-    if: needs.plan.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/download-artifact@v8
         with:
           pattern: site-*
           path: builds
 
-      # the stable (or only) build at the root, the dev build in dev/
+      # the stable (or only) build at the root, the dev build in dev/. With one build the
+      # download action extracts it into builds/ itself, with several into builds/site-<name>/.
       - name: Assemble the site
         run: |
           mkdir site
-          for build in builds/site-site builds/site-stable; do
-            if [ -d "$build" ]; then cp -R "$build"/. site/; fi
+          if [ -d builds/site-dev ]; then
+            cp -R builds/site-stable/. site/
+            mkdir site/dev
+            cp -R builds/site-dev/. site/dev/
+          elif [ -d builds/site-site ]; then
+            cp -R builds/site-site/. site/
+          else
+            cp -R builds/. site/
+          fi
+
+      - name: Check the assembled site
+        env:
+          SMOKE_PATHS: ${{ inputs.smoke-paths }}
+          STABLE: ${{ inputs.stable-branch }}
+          DEPLOY: ${{ needs.plan.outputs.deploy }}
+        run: |
+          missing=0
+          prefixes=""
+          # the dev build exists only when deploying with a stable branch
+          if [ "$DEPLOY" = true ] && [ -n "$STABLE" ]; then prefixes="dev/"; fi
+          for prefix in "" $prefixes; do
+            for path in index.html $SMOKE_PATHS; do
+              test -f "site/$prefix$path" || { echo "missing site/$prefix$path"; missing=1; }
+            done
           done
-          if [ -d builds/site-dev ]; then mkdir site/dev && cp -R builds/site-dev/. site/dev/; fi
+          echo "$(find site -type f | wc -l) files in the assembled site"
+          exit $missing
 
       - uses: actions/upload-pages-artifact@v5
+        if: needs.plan.outputs.deploy == 'true'
         with:
           path: site
 
+  deploy:
+    needs: [plan, assemble]
+    if: needs.plan.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+      # the pages must answer once deployed (an empty or missing site is a 404)
+      - name: Check the deployed site
+        env:
+          URL: ${{ steps.deployment.outputs.page_url }}
+          STABLE: ${{ inputs.stable-branch }}
+        run: |
+          for path in index.html ${STABLE:+dev/index.html}; do
+            curl --fail --silent --show-error --location --output /dev/null \
+              --retry 12 --retry-delay 10 --retry-all-errors "${URL%/}/$path"
+          done
