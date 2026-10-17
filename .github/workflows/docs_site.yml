@@ -1,8 +1,9 @@
 name: Docs
 
 # The example site in example/, built with the reusable docs.yml exactly as the projects use it,
-# on every push and pull request; deployed to https://max-models.github.io/starlight-theme/
-# from devel. (docs.yml itself keeps its name: projects call it by that path.)
+# on every push and pull request; deployed to https://max-models.github.io/starlight-theme/ from
+# main (the latest release) and to .../starlight-theme/dev/ from devel. (docs.yml itself keeps its
+# name: projects call it by that path.)
 
 on:
   push:
@@ -27,6 +28,7 @@ jobs:
       project-dir: example
       npm-lockfile: package-lock.json
       gallery: true
+      stable-branch: main
       smoke-paths: |
         getting-started/installation/index.html
         tutorials/index.html

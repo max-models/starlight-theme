@@ -13,3 +13,7 @@ npm run dev                                  # live preview at http://localhost:
 ```
 
 Edits to the theme's components, styles and config show up in the preview right away.
+
+`DOCS_CHANNEL=dev npm run build` builds the site as the docs workflow builds `devel` next to a
+release: at `/starlight-theme/dev/`, with the stable/dev switch in the header and a notice on
+every page (`DOCS_CHANNEL=stable` for the release).

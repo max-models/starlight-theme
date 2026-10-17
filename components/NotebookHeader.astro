@@ -1,6 +1,7 @@
 ---
-// The strip at the top of a tutorial page: download the notebook and open it on GitHub
-// (written by the starlight-notebooks tool).
+// The strip at the top of a tutorial page: download the notebook, open it on GitHub, and run it
+// in Colab or Binder if the site asks for that (`launch` of defineDocs); written by the
+// starlight-notebooks tool.
 import theme from 'virtual:starlight-theme/config';
 import { withBase } from '../utils/base';
 
@@ -11,10 +12,17 @@ export interface Props {
 	source: string;
 	/** "executed" (outputs from a run at build time) or "not run". */
 	status?: 'executed' | 'not run';
+	/** Show the site's launch buttons; false for a notebook that runs under MPI or opts out. */
+	launch?: boolean;
 }
-const { download, source, status = 'executed' } = Astro.props;
+const { download, source, status = 'executed', launch = true } = Astro.props;
 const filename = download.split('/').at(-1) ?? 'tutorial.ipynb';
 const github = `https://github.com/${theme.repository}/blob/${theme.branch}/${source}`;
+const services = {
+	colab: { label: 'Open in Colab', href: `https://colab.research.google.com/github/${theme.repository}/blob/${theme.branch}/${source}` },
+	binder: { label: 'Launch Binder', href: `https://mybinder.org/v2/gh/${theme.repository}/${theme.branch}?labpath=${encodeURIComponent(source)}` },
+};
+const launchLinks = launch ? theme.launch.map((service) => services[service]) : [];
 const notes = {
 	executed: 'Run when the site was built.',
 	'not run': 'Not run for this build: the outputs are missing.',
@@ -24,6 +32,7 @@ const notes = {
 <div class="notebook-header not-content">
 	<a class="notebook-button" href={withBase(download)} download={filename} data-notebook-download>Download notebook</a>
 	<a class="notebook-button secondary" href={github}>View on GitHub</a>
+	{launchLinks.map((link) => <a class="notebook-button secondary" href={link.href}>{link.label}</a>)}
 	<span class="notebook-note">{notes[status]}</span>
 </div>
 

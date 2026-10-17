@@ -1,8 +1,12 @@
 // The Starlight plugin: the look of the max-models sites (palette, header with a row of section
-// links, KaTeX styles) and the settings the components read (repository, branch, nav links).
+// links, KaTeX styles, favicon) and the settings the components read (repository, branch, nav links,
+// versions, projects menu).
 // `defineDocs` adds it for you; use it directly in a site that builds its own Astro config.
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { StarlightPlugin } from '@astrojs/starlight/types';
 import type { ViteUserConfig } from 'astro';
+import { docsUrl, projects as defaultProjects, type Project } from './projects.ts';
 
 export interface NavLink {
 	label: string;
@@ -12,6 +16,19 @@ export interface NavLink {
 	section?: string;
 }
 
+/** The stable and the development docs of one site, served side by side. */
+export interface Versions {
+	/** Which one this build is. */
+	current: 'stable' | 'dev';
+	/** Base path of the stable docs, e.g. "/simgeometry/". */
+	stable: string;
+	/** Base path of the development docs, e.g. "/simgeometry/dev/". */
+	dev: string;
+}
+
+/** Where a notebook page offers to run the notebook. */
+export type LaunchService = 'colab' | 'binder';
+
 export interface ThemeOptions {
 	/** GitHub repository as "owner/name": the "View on GitHub" links of notebook pages. */
 	repository: string;
@@ -19,6 +36,12 @@ export interface ThemeOptions {
 	branch?: string;
 	/** Links in the header, between the title and the search. */
 	nav?: NavLink[];
+	/** A stable/dev switch in the header and a notice on the dev pages. */
+	versions?: Versions;
+	/** "Open in Colab" / "Launch Binder" buttons on the notebook pages. Default none. */
+	launch?: LaunchService[];
+	/** The "Projects" menu of the header (default the max-models projects); `false` hides it. */
+	projects?: Project[] | false;
 }
 
 /** What `virtual:starlight-theme/config` exports. */
@@ -26,6 +49,9 @@ export interface ThemeConfig {
 	repository: string;
 	branch: string;
 	nav: Required<NavLink>[];
+	versions: Versions | null;
+	launch: LaunchService[];
+	projects: { title: string; description: string; href: string; current: boolean }[];
 }
 
 const VIRTUAL_ID = 'virtual:starlight-theme/config';
@@ -48,16 +74,29 @@ function viteConfigModule(config: ThemeConfig): NonNullable<ViteUserConfig['plug
 	};
 }
 
-export default function theme(options: ThemeOptions): StarlightPlugin {
-	const config: ThemeConfig = {
+export function themeConfig(options: ThemeOptions): ThemeConfig {
+	const [owner, repo] = options.repository.split('/');
+	return {
 		repository: options.repository,
 		branch: options.branch ?? 'devel',
 		nav: (options.nav ?? []).map((link) => ({ ...link, section: link.section ?? sectionOf(link.link) })),
+		versions: options.versions ?? null,
+		launch: options.launch ?? [],
+		projects: (options.projects === false ? [] : (options.projects ?? defaultProjects)).map((project) => ({
+			title: project.title,
+			description: project.description ?? '',
+			href: docsUrl(project),
+			current: project.repo === repo && (project.owner ?? 'max-models') === owner,
+		})),
 	};
+}
+
+export default function theme(options: ThemeOptions): StarlightPlugin {
+	const config = themeConfig(options);
 	return {
 		name: '@max-models/starlight-theme',
 		hooks: {
-			'config:setup'({ config: starlight, updateConfig, addIntegration }) {
+			'config:setup'({ config: starlight, updateConfig, addIntegration, addRouteMiddleware }) {
 				updateConfig({
 					// the theme first, so a site's own customCss wins
 					customCss: [
@@ -67,14 +106,28 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 					],
 					components: {
 						Header: '@max-models/starlight-theme/components/Header.astro',
+						Banner: '@max-models/starlight-theme/components/Banner.astro',
 						...starlight.components,
 					},
 				});
+				// the dev build: hero and prev/next links of the frontmatter into /<repo>/dev/
+				if (config.versions?.current === 'dev') {
+					addRouteMiddleware({ entrypoint: '@max-models/starlight-theme/route-middleware' });
+				}
 				addIntegration({
 					name: '@max-models/starlight-theme/config',
 					hooks: {
-						'astro:config:setup'({ updateConfig: updateAstroConfig }) {
+						'astro:config:setup'({ config: astro, injectRoute, updateConfig: updateAstroConfig }) {
 							updateAstroConfig({ vite: { plugins: [viteConfigModule(config)] } });
+							// the max-models favicon, unless the site has its own
+							const own = new URL('favicon.svg', astro.publicDir);
+							if (starlight.favicon === undefined && !existsSync(fileURLToPath(own))) {
+								injectRoute({
+									pattern: '/favicon.svg',
+									entrypoint: '@max-models/starlight-theme/routes/favicon.svg.ts',
+									prerender: true,
+								});
+							}
 						},
 					},
 				});
