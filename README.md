@@ -7,23 +7,40 @@ when it bumps its version.
 
 | Part | What it does |
 |---|---|
-| `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math, the theme, the API reference (starlight-pydocs), the link check, edit and GitHub links |
-| `theme()` Starlight plugin | The palette, a header with a row of section links, the KaTeX styles. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's |
+| `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
+| `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
+| `theme()` Starlight plugin | The palette, a header with a row of section links, a stable/dev switch and a projects menu, the KaTeX styles, the favicon. Used by `defineDocs`, or on its own in a site with its own config |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
-| `.github/workflows/docs.yml` | The reusable CI: install, notebooks, build, smoke test, deploy to GitHub Pages |
+| `.github/workflows/docs.yml` | The reusable CI: install, notebooks, build, smoke test, deploy to GitHub Pages (the release and `devel` side by side) |
+| `renovate-preset.json` | A Renovate preset that bumps the theme in `docs/package.json` and the workflow together |
 
 The Python tool ships inside the npm package, so the notebook converter and the components
 its pages import always come in matching versions.
 
 ## Using it in a project
 
-In `docs/`:
+In the root of a project, without installing anything first:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.2.0
+npx --package github:max-models/starlight-theme#v0.3.0 starlight-theme-init
+cd docs && npm install
+```
+
+It writes `docs/` (`package.json`, `astro.config.mjs`, `content.config.ts`, a home and an
+installation page), `.github/workflows/docs.yml` and `renovate.json`, from what it finds: the
+repository from the git remote, the description from `pyproject.toml`, the package in `src/`,
+notebooks in `tutorials/` and scripts in `examples/`. Files that exist are kept (`--force`
+overwrites them, `--dry-run` only shows what it would do), and it prints the Makefile targets.
+`--migrate` moves a project from the old copied setup: it removes the files the theme replaces
+and swaps their dependencies in the existing `docs/package.json` for the theme.
+
+By hand, in `docs/`:
+
+```sh
+npm install github:max-models/starlight-theme#v0.3.0
 ```
 
 `docs/package.json` then needs only:
@@ -32,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.2.0
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.2.0",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.3.0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -63,9 +80,20 @@ export default defineDocs({
 });
 ```
 
-Other options: `owner` (default `max-models`), `branch` (default `devel`), `pydocs` (overrides
-for the starlight-pydocs package entry), `inventories` (default Python and NumPy), and
-`starlight` / `astro` for anything else, merged over the result, e.g.
+Other options:
+
+| Option | |
+|---|---|
+| `owner`, `branch` | GitHub owner (default `max-models`) and the branch of the edit and source links (default `devel`) |
+| `pydocs` | Overrides for the starlight-pydocs package entry |
+| `inventories` | Sphinx inventories for the API reference (default Python and NumPy) |
+| `crossref` | Sibling projects whose API reference the annotations link to, e.g. `['mpiarray']`. Default: the max-models projects among the dependencies of `pyproject` (`../pyproject.toml`); `false` for none |
+| `projects` | The "Projects" menu of the header (default the max-models projects in `lib/projects.ts`); `false` hides it |
+| `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
+| `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page |
+| `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
+
+and `starlight` / `astro` for anything else, merged over the result, e.g.
 `astro: { redirects: { '/tutorials/': '/guides/' } }` (site-root paths; `defineDocs` adds the base
 path to the targets, which Astro does not) or `starlight: { plugins: [...] }`.
 A nav link is "current" on every page under its first path segment, or under `section`.
@@ -79,7 +107,8 @@ export { collections } from '@max-models/starlight-theme/content';
 Delete the copies the theme replaces: `src/components/{Header,NotebookHeader,NotebookImage,RawHtml}.astro`,
 `src/utils/base.ts`, `src/styles/custom.css`, `scripts/check-mdx.mjs`, `tools/notebooks.py`,
 `tools/mpi_kernel.py`, and the direct dependencies on katex, remark-math, rehype-katex,
-starlight-pydocs, starlight-links-validator, @astrojs/markdown-remark and @mdx-js/mdx.
+starlight-pydocs, starlight-links-validator, @astrojs/markdown-remark and @mdx-js/mdx
+(`starlight-theme-init --migrate` does both).
 A site's own `customCss` still works and loads after the theme's.
 
 ### Notebooks
@@ -99,7 +128,14 @@ the notebooks alone, so the directories only organise the sources), `section` th
 installed (`DOCS_MPI_RANKS=1` for a quick serial run). The cell tags `remove-cell`, `hide-input`,
 `fold-input`, `fold-output` (outputs in a closed box, titled by the cell metadata `fold_summary`),
 `remove-output`, `raises-exception` and nbclient's `skip-execution` are honoured, and notebook
-metadata `docs_order` sets the sidebar position. See the docstring of `tools/notebooks.py` for the rest.
+metadata `docs_order` sets the sidebar position.
+
+The index page of the section has a grid of cards of the other notebooks, with their first image:
+at the end of `index.ipynb`, or after its cell tagged `notebook-grid`; without an index notebook
+the tool writes an index page with only the grid (`"grid": false` turns it off). With `launch`
+set, the pages get "Open in Colab" / "Launch Binder" buttons, except for notebooks run on several
+MPI ranks or with the metadata `docs_launch: false`. See the docstring of `tools/notebooks.py` for
+the rest.
 
 ### Gallery
 
@@ -173,7 +209,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.2.0
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.3.0
     with:
       smoke-paths: |
         tutorials/index.html
@@ -182,8 +218,28 @@ jobs:
 
 Inputs: `extras` (default `docs`; e.g. `docs mpi`), `apt-packages` (e.g.
 `libopenmpi-dev openmpi-bin`), `notebooks`, `gallery`, `pre-build` (shell commands before the build, e.g.
-tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`),
+tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`), `stable-branch`,
 `python-version`, `node-version`, `project-dir`, `npm-lockfile`.
+
+With `stable-branch: main`, a push to `main` or `devel` builds both branches and deploys the
+release at `<owner>.github.io/<repo>/` and `devel` at `<repo>/dev/`. The header then has a
+stable/dev switch to the same page in the other one, and the dev pages a notice that links to the
+release. The workflow sets `DOCS_CHANNEL=stable|dev` for `defineDocs`, which moves the dev build to
+`/<repo>/dev/` together with the links of its pages that are written as `/<repo>/...`. Both
+branches must use a theme version that knows `DOCS_CHANNEL` (v0.3.0 or later) for the switch to
+show on both; the smoke paths must exist in both builds.
+
+### Renovate
+
+The `renovate.json` that `starlight-theme-init` writes extends the theme's preset, which bumps the
+theme in `docs/package.json` and the tag of the docs workflow in one pull request:
+
+```json
+{
+  "extends": ["config:recommended", "github>max-models/starlight-theme:renovate-preset"],
+  "baseBranchPatterns": ["devel"]
+}
+```
 
 ## Working on the theme
 
@@ -195,8 +251,10 @@ npm install                                  # the theme and the example, as one
 (cd example && uv sync --extra docs)         # Python for the notebooks and the API reference
 npm run notebooks -w example/docs -- execute
 npm run dev                                  # http://localhost:4321/starlight-theme/
-npm test                                     # tests of the notebook tool (needs uv)
+npm test                                     # npm run test:js (vitest) and test:py (pytest, needs uv)
 ```
+
+`DOCS_CHANNEL=dev npm run build` builds the example as the dev site at `/starlight-theme/dev/`.
 
 To try a change in a real project before a release, install the checkout into its `docs/` as a
 copy, `npm install --install-links ../../starlight-theme` (rerun it after each change, and go
@@ -210,11 +268,13 @@ Work happens on `devel`; `main` holds the releases.
 
 | Workflow | When | What |
 |---|---|---|
-| `test_pytest.yml` | push / pull request to `main` or `devel` | tests of the notebook tool |
-| `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `devel` |
+| `test_pytest.yml` | push / pull request to `main` or `devel` | tests of the notebook and gallery tools |
+| `test_vitest.yml` | push / pull request to `main` or `devel` | tests of `defineDocs`, the plugin and `starlight-theme-init` |
+| `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `main` and to <https://max-models.github.io/starlight-theme/dev/> from `devel` |
 | `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already |
 | `docs.yml` | called by the projects | the reusable docs build |
 
 To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. Projects then
 update with `npm install github:max-models/starlight-theme#vX.Y.Z` in `docs/` and the same tag in
-their docs workflow; Dependabot or Renovate can open those bumps.
+their docs workflow; the Renovate preset opens those bumps. A new project with a docs site goes
+into `lib/projects.ts`, for the projects menu and the cross-references.

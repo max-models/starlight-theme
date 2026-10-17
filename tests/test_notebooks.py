@@ -214,7 +214,15 @@ def test_notebooks_in_subdirectories(project, monkeypatch):
     write_notebook(guides / "a_intro.ipynb", [v4.new_markdown_cell("# Intro")])
     run(project, "convert", monkeypatch=monkeypatch)
     content = project / "docs" / "src" / "content" / "docs" / "guides"
-    assert sorted(p.name for p in content.iterdir()) == ["a-intro.mdx", "b-paths.mdx"]
+    # with no index notebook, an index page with the grid of the notebooks
+    assert sorted(p.name for p in content.iterdir()) == [
+        "a-intro.mdx",
+        "b-paths.mdx",
+        "index.mdx",
+    ]
+    grid = (content / "index.mdx").read_text()
+    assert 'title: "Guides"' in grid
+    assert '"group": "Drawing"' in grid and '"href": "/guides/b-paths/"' in grid
     page = (content / "b-paths.mdx").read_text()
     assert (
         '<NotebookHeader download="/guides/b-paths/b_paths.ipynb" source="guides/drawing/b_paths.ipynb"'
@@ -266,3 +274,88 @@ def test_fold_output(project, monkeypatch):
         in page
     )
     assert page.count("<details>") == 2
+
+
+def _grid_items(page: str) -> list[dict]:
+    start = page.index("<GalleryGrid items={") + len("<GalleryGrid items={")
+    return json.JSONDecoder().raw_decode(page, start)[0]
+
+
+def test_grid_on_the_index_notebook(project, monkeypatch):
+    v4 = nbformat.v4
+    guides = project / "guides"
+    write_notebook(
+        guides / "index.ipynb",
+        [
+            v4.new_markdown_cell("# Guides\n\nAll of them."),
+            v4.new_markdown_cell("The list:", metadata={"tags": ["notebook-grid"]}),
+            v4.new_markdown_cell("After the grid."),
+        ],
+    )
+    plot = [
+        v4.new_markdown_cell("# Plotting\n\nA plot of something interesting."),
+        v4.new_code_cell(
+            "plot()",
+            outputs=[v4.new_output("display_data", data={"image/png": PNG})],
+        ),
+    ]
+    write_notebook(guides / "plotting.ipynb", plot, docs_order=1)
+    write_notebook(
+        guides / "basics.ipynb", [v4.new_markdown_cell("# Basics")], docs_order=2
+    )
+    cache = project / "docs" / ".cache" / "notebooks"
+    cache.mkdir(parents=True)
+    write_notebook(cache / "plotting.ipynb", plot)
+    run(project, "convert", monkeypatch=monkeypatch)
+    content = project / "docs" / "src" / "content" / "docs" / "guides"
+    page = (content / "index.mdx").read_text()
+    assert "import GalleryGrid from" in page
+    assert (
+        page.index("The list:")
+        < page.index("<GalleryGrid")
+        < page.index("After the grid.")
+    )
+    assert 'filter={false} filterLabel="Filter notebooks…"' in page
+    items = _grid_items(page)
+    # in sidebar order, the first image as the thumbnail
+    assert [item["title"] for item in items] == ["Plotting", "Basics"]
+    assert items[0]["summary"] == "A plot of something interesting."
+    assert items[0]["thumbnail"] == {"kind": "png", "src": "/guides/plotting/1.png"}
+    assert items[0]["placeholder"] == ""
+    assert items[1]["thumbnail"] is None and items[1]["placeholder"] == "not run"
+
+    # without the tag, at the end; with "grid": false, none
+    write_notebook(guides / "index.ipynb", [v4.new_markdown_cell("# Guides")])
+    run(project, "convert", monkeypatch=monkeypatch)
+    assert (
+        (content / "index.mdx")
+        .read_text()
+        .rstrip()
+        .endswith('filterLabel="Filter notebooks…" />')
+    )
+    (project / "docs" / "package.json").write_text(
+        json.dumps({"starlight-notebooks": {"source": "../guides", "grid": False}})
+    )
+    run(project, "convert", monkeypatch=monkeypatch)
+    assert "GalleryGrid" not in (content / "index.mdx").read_text()
+
+
+def test_no_generated_index_next_to_a_hand_written_one(project, monkeypatch):
+    content = project / "docs" / "src" / "content" / "docs" / "guides"
+    content.mkdir(parents=True)
+    (content / "index.md").write_text("---\ntitle: Guides\n---\n")
+    write_notebook(project / "guides" / "a.ipynb", [])
+    run(project, "convert", monkeypatch=monkeypatch)
+    assert sorted(p.name for p in content.iterdir()) == ["a.mdx", "index.md"]
+
+
+def test_launch_buttons_off_under_mpi_or_metadata(project, monkeypatch):
+    guides = project / "guides"
+    write_notebook(guides / "plain.ipynb", [])
+    write_notebook(guides / "opted_out.ipynb", [], docs_launch=False)
+    run(project, "convert", monkeypatch=monkeypatch)
+    content = project / "docs" / "src" / "content" / "docs" / "guides"
+    assert "launch={false}" not in (content / "plain.mdx").read_text()
+    assert "launch={false}" in (content / "opted-out.mdx").read_text()
+    run(project, "convert", "--mpi-ranks", "2", monkeypatch=monkeypatch)
+    assert "launch={false}" in (content / "plain.mdx").read_text()

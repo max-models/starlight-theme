@@ -1,0 +1,33 @@
+name: Test Vitest
+
+# Tests of the TypeScript side: defineDocs, the theme plugin, the link rebasing of the dev build
+# and the starlight-theme-init scaffold (tests/*.test.ts).
+
+on:
+  push:
+    branches:
+      - main
+      - devel
+  pull_request:
+    branches:
+      - main
+      - devel
+
+jobs:
+  vitest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the npm packages
+        run: npm ci
+
+      - name: Run the tests
+        run: npm run test:js

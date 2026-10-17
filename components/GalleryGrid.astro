@@ -1,6 +1,7 @@
 ---
 // The grid of cards on the gallery page, one per example, under a heading per group, with a
-// filter box (written by the starlight-gallery tool).
+// filter box (written by the starlight-gallery tool). The index page of the notebooks has one too
+// (starlight-notebooks).
 import { withBase } from '../utils/base';
 import PlotlyFigure from './PlotlyFigure.astro';
 
@@ -13,11 +14,17 @@ export interface Item {
 	group: string;
 	/** The first figure of the example, if it has run. */
 	thumbnail: { kind: 'plotly' | 'png'; src: string } | null;
+	/** Text in place of a missing thumbnail. Default "not run". */
+	placeholder?: string;
 }
 export interface Props {
 	items: Item[];
+	/** Show the filter box. Default true. */
+	filter?: boolean;
+	/** Placeholder of the filter box. */
+	filterLabel?: string;
 }
-const { items } = Astro.props;
+const { items, filter = true, filterLabel = 'Filter examples…' } = Astro.props;
 const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 	name: group,
 	items: items.filter((item) => item.group === group),
@@ -25,7 +32,7 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 ---
 
 <div class="gallery not-content">
-	<input class="gallery-filter" type="search" placeholder="Filter examples…" aria-label="Filter examples" data-gallery-filter />
+	{filter && <input class="gallery-filter" type="search" placeholder={filterLabel} aria-label={filterLabel.replace(/…$/, '')} data-gallery-filter />}
 	{
 		groups.map((group) => (
 			<section class="gallery-group" data-gallery-group>
@@ -37,7 +44,7 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 								<div class="gallery-thumb">
 									{item.thumbnail?.kind === 'plotly' && <PlotlyFigure src={item.thumbnail.src} thumbnail />}
 									{item.thumbnail?.kind === 'png' && <img src={withBase(item.thumbnail.src)} alt="" loading="lazy" />}
-									{!item.thumbnail && <span class="gallery-empty">not run</span>}
+									{!item.thumbnail && <span class="gallery-empty">{item.placeholder ?? 'not run'}</span>}
 								</div>
 								<div class="gallery-text">
 									<h3>{item.title}</h3>
@@ -50,7 +57,7 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 			</section>
 		))
 	}
-	<p class="gallery-none" hidden>No example matches.</p>
+	<p class="gallery-none" hidden>Nothing matches.</p>
 </div>
 
 <script>

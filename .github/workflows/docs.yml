@@ -2,7 +2,7 @@ name: Docs
 
 # The reusable build of a max-models docs site (docs/, Astro + Starlight with this theme):
 # install the project, execute and convert the notebooks, build, smoke test, and deploy to
-# GitHub Pages from one branch. A project calls it from its own .github/workflows/docs.yml:
+# GitHub Pages. A project calls it from its own .github/workflows/docs.yml:
 #
 #   on:
 #     push: { branches: ["main", "devel"] }
@@ -12,11 +12,16 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.2.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.3.0
 #       with:
+#         stable-branch: main
 #         smoke-paths: |
 #           tutorials/shapes-and-node-masks/1.png
 #           api/simgeometry/index.html
+#
+# Without stable-branch, a push to deploy-branch deploys that branch at <owner>.github.io/<repo>/.
+# With it, a push to either branch builds both and deploys stable-branch there and deploy-branch at
+# <repo>/dev/, with a stable/dev switch in the header (DOCS_CHANNEL, read by defineDocs).
 
 on:
   workflow_call:
@@ -64,20 +69,66 @@ on:
         type: boolean
         default: true
       deploy-branch:
+        description: The branch deployed (at <repo>/dev/ when stable-branch is set).
         type: string
         default: devel
+      stable-branch:
+        description: The release branch, e.g. "main", deployed at <repo>/ next to deploy-branch.
+        type: string
+        default: ""
 
 jobs:
-  build:
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.plan.outputs.builds }}
+      deploy: ${{ steps.plan.outputs.deploy }}
+    steps:
+      - id: plan
+        env:
+          DEPLOY: ${{ inputs.deploy }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEV: ${{ inputs.deploy-branch }}
+          STABLE: ${{ inputs.stable-branch }}
+        run: |
+          deploy=false
+          if [ "$DEPLOY" = true ] && [ "$EVENT" != pull_request ]; then
+            if [ "$REF" = "refs/heads/$DEV" ] || { [ -n "$STABLE" ] && [ "$REF" = "refs/heads/$STABLE" ]; }; then
+              deploy=true
+            fi
+          fi
+          if [ "$deploy" = true ] && [ -n "$STABLE" ]; then
+            builds=$(jq -cn --arg stable "$STABLE" --arg dev "$DEV" '[
+              {name: "stable", ref: $stable, channel: "stable", path: ""},
+              {name: "dev", ref: $dev, channel: "dev", path: "dev/"}]')
+          else
+            builds='[{"name": "site", "ref": "", "channel": "", "path": ""}]'
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "builds=$builds" >> "$GITHUB_OUTPUT"
+          echo "deploy: $deploy, builds: $builds"
+
+  build:
+    needs: plan
+    name: build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
     defaults:
       run:
         shell: bash
         working-directory: ${{ inputs.project-dir }}
     env:
       DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
+      DOCS_CHANNEL: ${{ matrix.channel }}
+      DOCS_STABLE_BRANCH: ${{ inputs.stable-branch }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -131,7 +182,7 @@ jobs:
         working-directory: ${{ inputs.project-dir }}/docs
         env:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
-          BASE: /${{ github.event.repository.name }}/
+          BASE: /${{ github.event.repository.name }}/${{ matrix.path }}
         run: |
           missing=0
           for path in index.html $SMOKE_PATHS; do
@@ -140,17 +191,38 @@ jobs:
           grep -q "href=\"$BASE" dist/index.html || { echo "links do not use the base path $BASE"; missing=1; }
           exit $missing
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-artifact@v7
+        if: needs.plan.outputs.deploy == 'true'
         with:
+          name: site-${{ matrix.name }}
           path: ${{ inputs.project-dir }}/docs/dist
+          retention-days: 1
 
   deploy:
-    needs: build
-    if: inputs.deploy && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', inputs.deploy-branch)
+    needs: [plan, build]
+    if: needs.plan.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: site-*
+          path: builds
+
+      # the stable (or only) build at the root, the dev build in dev/
+      - name: Assemble the site
+        run: |
+          mkdir site
+          for build in builds/site-site builds/site-stable; do
+            if [ -d "$build" ]; then cp -R "$build"/. site/; fi
+          done
+          if [ -d builds/site-dev ]; then mkdir site/dev && cp -R builds/site-dev/. site/dev/; fi
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
       - id: deployment
         uses: actions/deploy-pages@v5

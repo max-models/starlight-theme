@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Bump @max-models/starlight-theme in docs/package.json and the docs workflow together. Extend it as \"github>max-models/starlight-theme:renovate-preset\".",
+  "packageRules": [
+    {
+      "description": "The theme's npm tag and the tag of its reusable workflow, in one pull request",
+      "matchDepNames": ["@max-models/starlight-theme", "max-models/starlight-theme"],
+      "groupName": "starlight-theme",
+      "groupSlug": "starlight-theme",
+      "separateMajorMinor": false,
+      "commitMessageTopic": "starlight-theme"
+    }
+  ]
+}

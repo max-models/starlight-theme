@@ -23,12 +23,16 @@ Settings, from the ``"starlight-notebooks"`` entry of ``docs/package.json`` (pat
 ``section``   the URL and content directory of the pages (default: the name of ``source``)
 ``mpiRanks``  MPI ranks per notebook (default 1; ``DOCS_MPI_RANKS`` overrides it, e.g.
               ``DOCS_MPI_RANKS=1`` for a quick serial run)
+``grid``      a grid of cards of the other notebooks on the index page (default true): at the end
+              of ``index.ipynb``, or after its cell tagged ``notebook-grid``; without an index
+              notebook (and no hand-written ``index.md``) an index page with only the grid
 
 Cell tags: ``remove-cell``, ``hide-input``, ``fold-input`` (code in a closed <details>),
 ``fold-output`` (the outputs in a closed <details>, titled by the cell metadata ``fold_summary``,
-default "Show output"), ``remove-output``, ``raises-exception``, and nbclient's
-``skip-execution`` (shown, not run). Notebook metadata ``docs_order`` sets the sidebar order
-(else ``index`` first, then by file name).
+default "Show output"), ``remove-output``, ``raises-exception``, ``notebook-grid`` (see
+``grid``), and nbclient's ``skip-execution`` (shown, not run). Notebook metadata ``docs_order``
+sets the sidebar order (else ``index`` first, then by file name), and ``docs_launch: false`` hides
+the site's Colab/Binder buttons (as do ``mpiRanks`` > 1).
 
 Usage: starlight-notebooks <execute|convert|clean> [options]   (in docs/, or with --docs)
 """
@@ -59,6 +63,7 @@ class Settings:
     source: Path
     section: str
     mpi_ranks: int
+    grid: bool = True
 
     @functools.cached_property
     def repo(self) -> Path:
@@ -112,11 +117,18 @@ def load_settings(args: argparse.Namespace) -> Settings:
         source=source,
         section=args.section or config.get("section", source.name),
         mpi_ranks=int(ranks),
+        grid=bool(config.get("grid", True)),
     )
 
 
 def slug_of(path: Path) -> str:
     return re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-")
+
+
+def group_of(source: Path, path: Path) -> str:
+    """The heading of a file in a grid of cards: its top subdirectory of ``source``, if any."""
+    parts = path.relative_to(source).parts[:-1]
+    return re.sub(r"[-_]+", " ", parts[0]).strip().capitalize() if parts else ""
 
 
 def notebooks(settings: Settings) -> list[Path]:
@@ -366,6 +378,10 @@ class Page:
         self.components: set[str] = set()
         self.errors: list[str] = []
         self.assets = 0
+        self.title = ""
+        self.description = ""
+        self.order = 0
+        self.thumbnail: str | None = None  # the first image output, for the grid
 
     def asset(self, suffix: str) -> tuple[Path, str]:
         self.assets += 1
@@ -429,6 +445,7 @@ def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str
     if mime is not None:  # a GIF is an animation, e.g. from IPython.display.Image
         path, url = page.asset(_IMAGES[mime])
         path.write_bytes(base64.b64decode(_text(data[mime])))
+        page.thumbnail = page.thumbnail or url
         page.components.add("NotebookImage")
         return f'<NotebookImage src="{url}" />'
     if "image/svg+xml" in data:
@@ -454,21 +471,56 @@ def sidebar_order(metadata: dict, default: int) -> int:
     return metadata.get("docs_order", metadata.get("guide", {}).get("order", default))
 
 
+def grid_card(settings: Settings, source: Path, page: Page, executed: bool) -> dict:
+    """The card of a notebook page in the grid of the index page (see GalleryGrid.astro)."""
+    return {
+        "title": page.title,
+        "summary": page.description,
+        "href": f"/{settings.section}/{page.slug}/",
+        "group": group_of(settings.source, source),
+        "thumbnail": {"kind": "png", "src": page.thumbnail} if page.thumbnail else None,
+        "placeholder": "" if executed else "not run",
+    }
+
+
+def grid_component(cards: list[dict]) -> str:
+    return (
+        f"<GalleryGrid items={{{json.dumps(cards, ensure_ascii=False)}}} "
+        f"filter={{{'true' if len(cards) > 6 else 'false'}}} "
+        'filterLabel="Filter notebooks…" />'
+    )
+
+
 def convert_notebook(
-    settings: Settings, source: Path, executed: Path | None, order: int
+    settings: Settings,
+    source: Path,
+    executed: Path | None,
+    order: int,
+    cards: list[dict] | None = None,
 ) -> Page:
+    """Write the page of a notebook; ``cards`` is the grid of the index page."""
     import nbformat
 
     slug = slug_of(source)
-    order = sidebar_order(nbformat.read(source, as_version=4).metadata, order)
+    metadata = nbformat.read(source, as_version=4).metadata
+    order = sidebar_order(metadata, order)
     nb = nbformat.read(executed or source, as_version=4)
     page = Page(settings, slug)
+    page.order = order
     shutil.rmtree(page.public, ignore_errors=True)
     title = None
     description = ""
     body = []
+    grid_placed = cards is None
     for index, cell in enumerate(nb.cells):
         tags = list(cell.metadata.get("tags", []))
+        if "notebook-grid" in tags and not grid_placed:
+            # after the cell, or in its place if it is removed
+            grid_placed = True
+            if "remove-cell" in tags:
+                body.append(grid_component(cards))
+                continue
+            tags.append("_grid_after")
         if "remove-cell" in tags:
             continue
         if cell.cell_type == "markdown":
@@ -493,6 +545,8 @@ def convert_notebook(
                     code = f"<details>\n<summary>Show code</summary>\n\n{code}\n\n</details>"
                 body.append(code)
             if "remove-output" in tags:
+                if "_grid_after" in tags:
+                    body.append(grid_component(cards))
                 continue
             outputs = [
                 converted
@@ -509,7 +563,15 @@ def convert_notebook(
                     + "\n\n</details>"
                 ]
             body += outputs
+        if "_grid_after" in tags:
+            body.append(grid_component(cards))
+    if not grid_placed:
+        body.append(grid_component(cards))
+    if cards is not None:
+        page.components.add("GalleryGrid")
     title = title or source.stem.replace("_", " ").capitalize()
+    page.title = title
+    page.description = description or title
     imports = [
         f"import {name} from '{PACKAGE}/components/{name}.astro';"
         for name in ["NotebookHeader", *sorted(page.components)]
@@ -525,9 +587,12 @@ def convert_notebook(
         f"  order: {order}",
         "---",
     ]
+    launch = settings.mpi_ranks <= 1 and metadata.get("docs_launch", True)
     header = (
         f'<NotebookHeader download="/{settings.section}/{slug}/{source.name}" '
-        f'source="{source.relative_to(settings.repo).as_posix()}" status="{status}" />'
+        f'source="{source.relative_to(settings.repo).as_posix()}" status="{status}"'
+        + ("" if launch else " launch={false}")
+        + " />"
     )
     text = (
         "\n".join(frontmatter) + "\n\n" + "\n".join(imports) + "\n\n" + header + "\n\n"
@@ -538,28 +603,73 @@ def convert_notebook(
     return page
 
 
+def write_index(settings: Settings, cards: list[dict]) -> None:
+    """The index page of a section without an index notebook: the grid of the notebooks."""
+    title = settings.section.replace("-", " ").replace("_", " ").capitalize()
+    frontmatter = [
+        "---",
+        f"title: {_yaml_string(title)}",
+        f"description: {_yaml_string(f'{title}: the notebooks of this section.')}",
+        "tableOfContents: false",
+        "sidebar:",
+        "  order: 0",
+        "---",
+    ]
+    text = (
+        "\n".join(frontmatter)
+        + f"\n\nimport GalleryGrid from '{PACKAGE}/components/GalleryGrid.astro';\n\n"
+        + grid_component(cards)
+        + "\n"
+    )
+    settings.content.mkdir(parents=True, exist_ok=True)
+    (settings.content / "index.mdx").write_text(text)
+
+
 def cmd_convert(settings: Settings, args: argparse.Namespace) -> None:
     sources = notebooks(settings)
+    index = next((path for path in sources if slug_of(path) == "index"), None)
+    generated_index = (
+        settings.grid and index is None and not (settings.content / "index.md").exists()
+    )
     # only remove pages of deleted notebooks, so a running `astro dev` does not lose them all
     expected = {f"{slug_of(path)}.mdx" for path in sources}
+    if generated_index:
+        expected.add("index.mdx")
     for stale in settings.content.glob("*.mdx"):
         if stale.name not in expected:
             stale.unlink()
     problems = []
-    for order, source in enumerate(sources, start=1):
+
+    def convert(source: Path, order: int, cards: list[dict] | None = None) -> dict:
         slug = slug_of(source)
         executed = settings.cache / f"{slug}.ipynb"
         error_file = executed.with_suffix(".error")
         fresh = executed.exists() and cell_hash(executed) == cell_hash(source)
-        page = convert_notebook(settings, source, executed if fresh else None, order)
+        page = convert_notebook(
+            settings, source, executed if fresh else None, order, cards
+        )
         state = "executed" if fresh else "not run"
         if error_file.exists():
             problems.append(f"{slug}: run failed: {error_file.read_text().strip()}")
         elif not fresh:
             problems.append(f"{slug}: not executed or source changed")
-        problems += [f"{slug}: {error}" for error in page.errors]
+        problems.extend(f"{slug}: {error}" for error in page.errors)
         target = (settings.content / f"{slug}.mdx").relative_to(settings.docs)
         print(f"[notebooks] {slug}: {state}, {page.assets} assets -> {target}")
+        return {"order": page.order, **grid_card(settings, source, page, fresh)}
+
+    # the index page last, when the cards of the others are known
+    orders = {source: order for order, source in enumerate(sources, start=1)}
+    cards = [convert(source, orders[source]) for source in sources if source != index]
+    cards = [
+        {key: value for key, value in card.items() if key != "order"}
+        for card in sorted(cards, key=lambda card: card["order"])
+    ]
+    if index is not None:
+        convert(index, orders[index], cards if settings.grid else None)
+    elif generated_index:
+        write_index(settings, cards)
+        print(f"[notebooks] index: grid of {len(cards)} notebooks")
     for problem in problems:
         print(f"[notebooks] warning: {problem}")
     if args.strict and problems:
