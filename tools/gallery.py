@@ -41,7 +41,6 @@ import ast
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -97,11 +96,6 @@ class Example:
     code: str
 
 
-def _group_of(settings: GallerySettings, path: Path) -> str:
-    parts = path.relative_to(settings.source).parts[:-1]
-    return re.sub(r"[-_]+", " ", parts[0]).strip().capitalize() if parts else ""
-
-
 def parse_example(settings: GallerySettings, path: Path) -> Example:
     """Split a script into its docstring (title, summary, body) and the code below it."""
     text = path.read_text()
@@ -122,7 +116,7 @@ def parse_example(settings: GallerySettings, path: Path) -> Example:
     return Example(
         path=path,
         slug=nb_tool.slug_of(path),
-        group=_group_of(settings, path),
+        group=nb_tool.group_of(settings.source, path),
         title=title,
         summary=_description(rest) or title,
         body=rest,

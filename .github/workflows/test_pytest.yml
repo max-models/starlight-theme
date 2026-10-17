@@ -1,6 +1,6 @@
 name: Test Pytest
 
-# Tests of the notebook tool (tools/notebooks.py).
+# Tests of the notebook and gallery tools (tools/*.py).
 
 on:
   push:

@@ -1,6 +1,7 @@
 ---
-// A top nav bar with the site title, a row of section links, then search, socials and theme.
-// Starlight's default Header has no link row, so the theme plugin replaces it with this one.
+// A top nav bar with the site title, a row of section links, then search, the stable/dev switch,
+// the projects menu, socials and theme. Starlight's default Header has no link row, so the theme
+// plugin replaces it with this one.
 import config from 'virtual:starlight/user-config';
 import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
 import Search from 'virtual:starlight/components/Search';
@@ -18,6 +19,13 @@ const navLinks = theme.nav.map((link) => ({ ...link, href: withBase(link.link), 
 
 const { pathname } = Astro.url;
 const isCurrent = (section: string) => pathname.startsWith(section);
+
+// the same page in the other version (the stable base is a prefix of the dev one)
+const versions = theme.versions;
+const page = versions && pathname.slice(versions[versions.current].length);
+const versionLinks = versions
+	? (['stable', 'dev'] as const).map((name) => ({ name, href: versions[name] + page, current: versions.current === name }))
+	: [];
 ---
 
 <div class="header">
@@ -37,6 +45,34 @@ const isCurrent = (section: string) => pathname.startsWith(section);
 		{shouldRenderSearch && <Search />}
 	</div>
 	<div class="sl-hidden md:sl-flex print:hidden right-group">
+		{
+			versionLinks.length > 0 && (
+				<nav class="versions" aria-label="Version">
+					{versionLinks.map((link) => (
+						<a href={link.href} class:list={{ current: link.current }} aria-current={link.current ? 'page' : undefined}>
+							{link.name}
+						</a>
+					))}
+				</nav>
+			)
+		}
+		{
+			theme.projects.length > 0 && (
+				<details class="projects-menu" data-projects-menu>
+					<summary>Projects</summary>
+					<ul>
+						{theme.projects.map((project) => (
+							<li>
+								<a href={project.href} aria-current={project.current ? 'page' : undefined}>
+									<span class="project-title">{project.title}</span>
+									{project.description && <span class="project-description">{project.description}</span>}
+								</a>
+							</li>
+						))}
+					</ul>
+				</details>
+			)
+		}
 		<div class="sl-flex social-icons">
 			<SocialIcons />
 		</div>
@@ -44,6 +80,22 @@ const isCurrent = (section: string) => pathname.startsWith(section);
 		<LanguageSelect />
 	</div>
 </div>
+
+<script>
+	// close the projects menu on a click elsewhere or Escape
+	const menu = document.querySelector<HTMLDetailsElement>('[data-projects-menu]');
+	if (menu) {
+		document.addEventListener('click', (event) => {
+			if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
+		});
+		menu.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape' && menu.open) {
+				menu.open = false;
+				menu.querySelector('summary')?.focus();
+			}
+		});
+	}
+</script>
 
 <style>
 	@layer starlight.core {
@@ -94,6 +146,99 @@ const isCurrent = (section: string) => pathname.startsWith(section);
 		.social-icons {
 			gap: 1rem;
 			align-items: center;
+		}
+
+		.versions {
+			display: flex;
+			border: 1px solid var(--sl-color-hairline-light);
+			border-radius: 0.25rem;
+			overflow: hidden;
+			font-size: var(--sl-text-xs);
+			font-weight: 600;
+		}
+
+		.versions a {
+			padding: 0.15rem 0.5rem;
+			color: var(--sl-color-gray-2);
+			text-decoration: none;
+		}
+
+		.versions a:hover {
+			color: var(--sl-color-white);
+		}
+
+		.versions a.current {
+			background: var(--sl-color-accent-low);
+			color: var(--sl-color-text-accent);
+		}
+
+		.projects-menu {
+			position: relative;
+			font-size: var(--sl-text-sm);
+		}
+
+		.projects-menu summary {
+			cursor: pointer;
+			list-style: none;
+			font-weight: 600;
+			color: var(--sl-color-gray-2);
+			white-space: nowrap;
+		}
+
+		.projects-menu summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.projects-menu summary::after {
+			content: '▾';
+			margin-inline-start: 0.3rem;
+			font-size: 0.8em;
+		}
+
+		.projects-menu summary:hover,
+		.projects-menu[open] summary {
+			color: var(--sl-color-white);
+		}
+
+		.projects-menu ul {
+			position: absolute;
+			inset-inline-end: 0;
+			top: calc(100% + 0.75rem);
+			z-index: 20;
+			width: 19rem;
+			margin: 0;
+			padding: 0.4rem;
+			list-style: none;
+			border: 1px solid var(--sl-color-hairline-light);
+			border-radius: 0.5rem;
+			background: var(--sl-color-bg-nav);
+			box-shadow: var(--sl-shadow-md);
+		}
+
+		.projects-menu li a {
+			display: flex;
+			flex-direction: column;
+			padding: 0.45rem 0.65rem;
+			border-radius: 0.3rem;
+			text-decoration: none;
+		}
+
+		.projects-menu li a:hover {
+			background: var(--sl-color-accent-low);
+		}
+
+		.project-title {
+			font-weight: 600;
+			color: var(--sl-color-white);
+		}
+
+		.projects-menu a[aria-current] .project-title {
+			color: var(--sl-color-text-accent);
+		}
+
+		.project-description {
+			font-size: var(--sl-text-xs);
+			color: var(--sl-color-gray-3);
 		}
 
 		.social-icons::after {
