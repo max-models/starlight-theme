@@ -227,16 +227,17 @@ jobs:
         env:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
           STABLE: ${{ inputs.stable-branch }}
+          DEPLOY: ${{ needs.plan.outputs.deploy }}
         run: |
           missing=0
           prefixes=""
-          if [ -n "$STABLE" ] && [ -d site/dev ]; then prefixes="dev/"; fi
+          # the dev build exists only when deploying with a stable branch
+          if [ "$DEPLOY" = true ] && [ -n "$STABLE" ]; then prefixes="dev/"; fi
           for prefix in "" $prefixes; do
             for path in index.html $SMOKE_PATHS; do
               test -f "site/$prefix$path" || { echo "missing site/$prefix$path"; missing=1; }
             done
           done
-          if [ -n "$STABLE" ]; then test -f site/dev/index.html || { echo "missing site/dev/index.html"; missing=1; }; fi
           echo "$(find site -type f | wc -l) files in the assembled site"
           exit $missing
 
