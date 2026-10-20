@@ -289,12 +289,8 @@ _ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def _escape_plain(text: str) -> str:
-    return (
-        text.replace("{", "\\{")
-        .replace("}", "\\}")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    # MDX parses only < and { in text; a > stays, so blockquotes keep working
+    return text.replace("{", "\\{").replace("}", "\\}").replace("<", "&lt;")
 
 
 def _escape_text(text: str) -> str:

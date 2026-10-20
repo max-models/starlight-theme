@@ -165,6 +165,17 @@ describe('stable and dev builds', () => {
 	});
 });
 
+describe('pydocs overrides', () => {
+	it('adds a site\'s member excludes to the tests', () => {
+		const pydocs = (pydocs: Any) => build({ pythonPackage: 'cunumpy', pydocs }).pydocs.packages[0];
+		expect(pydocs({ docstringStyle: 'numpy', members: { exclude: ['cunumpy.mpi.*'], private: true } })).toMatchObject({
+			docstringStyle: 'numpy',
+			members: { private: true, exclude: ['cunumpy.tests', 'cunumpy.tests.*', 'cunumpy.mpi.*'] },
+		});
+		expect(pydocs(undefined).members).toEqual({ exclude: ['cunumpy.tests', 'cunumpy.tests.*'] });
+	});
+});
+
 describe('cross-references to sibling projects', () => {
 	const inventories = (options: Any) => build({ pythonPackage: 'patchwork', repo: 'patchwork', ...options }).pydocs.inventories;
 
@@ -207,6 +218,14 @@ describe('theme plugin', () => {
 		const current = setup.virtual.projects.filter((project: Any) => project.current);
 		expect(current.map((project: Any) => project.href)).toEqual(['https://max-models.github.io/mpiarray/']);
 		expect(themeConfig({ repository: 'a/b', projects: false }).projects).toEqual([]);
+	});
+
+	it('loads the menu from projects.json unless the site has its own list', () => {
+		expect(themeConfig({ repository: 'a/b' }).projectsUrl).toBe('https://max-models.github.io/projects.json');
+		expect(themeConfig({ repository: 'a/b', projectsUrl: 'https://example.org/p.json' }).projectsUrl).toBe('https://example.org/p.json');
+		expect(themeConfig({ repository: 'a/b', projectsUrl: false }).projectsUrl).toBeNull();
+		expect(themeConfig({ repository: 'a/b', projects: [{ repo: 'x', title: 'x' }] }).projectsUrl).toBeNull();
+		expect(themeConfig({ repository: 'a/b', projects: false }).projectsUrl).toBeNull();
 	});
 
 	it('puts its CSS first and keeps the site components', () => {

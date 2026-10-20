@@ -1,6 +1,6 @@
 ---
 // A top nav bar with the site title, a row of section links, then search, the stable/dev switch,
-// the projects menu, socials and theme. Starlight's default Header has no link row, so the theme
+// the projects menu (built in, then replaced by projects.json when it loads), socials and theme. Starlight's default Header has no link row, so the theme
 // plugin replaces it with this one.
 import config from 'virtual:starlight/user-config';
 import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
@@ -57,8 +57,14 @@ const versionLinks = versions
 			)
 		}
 		{
-			theme.projects.length > 0 && (
-				<details class="projects-menu" data-projects-menu>
+			(theme.projects.length > 0 || theme.projectsUrl) && (
+				<details
+					class="projects-menu"
+					data-projects-menu
+					data-projects-url={theme.projectsUrl}
+					data-repository={theme.repository}
+					hidden={theme.projects.length === 0}
+				>
 					<summary>Projects</summary>
 					<ul>
 						{theme.projects.map((project) => (
@@ -70,6 +76,15 @@ const versionLinks = versions
 							</li>
 						))}
 					</ul>
+					{/* rendered here so the entries the script adds get the scoped styles */}
+					<template>
+						<li>
+							<a>
+								<span class="project-title" />
+								<span class="project-description" />
+							</a>
+						</li>
+					</template>
 				</details>
 			)
 		}
@@ -82,8 +97,43 @@ const versionLinks = versions
 </div>
 
 <script>
-	// close the projects menu on a click elsewhere or Escape
+	import { menuEntries, type MenuEntry } from '../lib/project-menu.ts';
+
 	const menu = document.querySelector<HTMLDetailsElement>('[data-projects-menu]');
+
+	// the menu as it is now in projects.json; the built-in one stays when that does not load
+	function render(entries: MenuEntry[]) {
+		const list = menu!.querySelector('ul')!;
+		const template = menu!.querySelector('template')!;
+		list.replaceChildren(
+			...entries.map((entry) => {
+				const item = template.content.firstElementChild!.cloneNode(true) as HTMLLIElement;
+				const link = item.querySelector('a')!;
+				link.href = entry.href;
+				if (entry.current) link.setAttribute('aria-current', 'page');
+				link.querySelector('.project-title')!.textContent = entry.title;
+				const description = link.querySelector('.project-description')!;
+				if (entry.description) description.textContent = entry.description;
+				else description.remove();
+				return item;
+			})
+		);
+		menu!.hidden = entries.length === 0;
+	}
+
+	const url = menu?.dataset.projectsUrl;
+	if (menu && url) {
+		const [owner, repo] = (menu.dataset.repository ?? '').split('/');
+		fetch(url)
+			.then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+			.then((projects) => {
+				const entries = menuEntries(projects, owner, repo);
+				if (entries.length > 0) render(entries);
+			})
+			.catch(() => {});
+	}
+
+	// close the projects menu on a click elsewhere or Escape
 	if (menu) {
 		document.addEventListener('click', (event) => {
 			if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
@@ -213,6 +263,8 @@ const versionLinks = versions
 			border-radius: 0.5rem;
 			background: var(--sl-color-bg-nav);
 			box-shadow: var(--sl-shadow-md);
+			max-height: calc(100vh - var(--sl-nav-height) - 2rem);
+			overflow-y: auto;
 		}
 
 		.projects-menu li a {

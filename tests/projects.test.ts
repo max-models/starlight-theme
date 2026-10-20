@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { menuEntries } from '../lib/project-menu.ts';
 import { dependenciesOf, dependencyProjects, inventoryUrl, projects } from '../lib/projects.ts';
 
 const pyproject = `[build-system]
@@ -53,6 +54,7 @@ describe('dependencyProjects', () => {
 		const path = join(directory, 'pyproject.toml');
 		writeFileSync(path, pyproject);
 		expect(dependencyProjects(path, 'tree-d-3d').map((project) => project.repo)).toEqual([
+			'cunumpy',
 			'maybempi',
 			'simgeometry',
 			'plasma-plots',
@@ -66,5 +68,34 @@ describe('inventoryUrl', () => {
 		const plasmaPlots = projects.find((project) => project.repo === 'plasma-plots')!;
 		expect(inventoryUrl(plasmaPlots)).toBe('https://max-models.github.io/plasma-plots/api/plasma_plots/objects.inv');
 		expect(inventoryUrl({ repo: 'x', title: 'x' })).toBeUndefined();
+	});
+});
+
+describe('menuEntries', () => {
+	it('links every project and marks the current site', () => {
+		const entries = menuEntries(
+			[
+				{ repo: 'mpiarray', title: 'mpiarray', description: 'Arrays' },
+				{ repo: 'gallery', owner: 'spokes3d', title: 'Gallery' },
+			],
+			'spokes3d',
+			'gallery'
+		);
+		expect(entries).toEqual([
+			{ title: 'mpiarray', description: 'Arrays', href: 'https://max-models.github.io/mpiarray/', current: false },
+			{ title: 'Gallery', description: '', href: 'https://spokes3d.github.io/gallery/', current: true },
+		]);
+	});
+
+	it('skips what is not a project (projects.json is edited by hand)', () => {
+		expect(menuEntries({ projects: [] }, 'max-models', 'x')).toEqual([]);
+		expect(menuEntries([null, 'cunumpy', { repo: 'x' }, { repo: 'y', title: 'y', description: 3 }], 'max-models', 'x')).toEqual([
+			{ title: 'y', description: '', href: 'https://max-models.github.io/y/', current: false },
+		]);
+	});
+
+	it('knows every repository once', () => {
+		const keys = projects.map((project) => `${project.owner ?? 'max-models'}/${project.repo}`);
+		expect(new Set(keys).size).toBe(keys.length);
 	});
 });
