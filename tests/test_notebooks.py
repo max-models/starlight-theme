@@ -35,6 +35,16 @@ GIF = base64.b64encode(b"GIF89afake").decode()
         ("```py\nd = {1: 2}\n```", "```py\nd = {1: 2}\n```"),
         (r"\(x^2\)", "$x^2$"),
         (r"\[x^2\]", "\n$$\nx^2\n$$\n"),
+        # a display block that opens and closes on lines with other text
+        ("$$a =\nb.$$\n\nafter", "$$\na =\nb.\n$$\n\nafter"),
+        # a one-line display block on its own line
+        ("x is\n\n$$y = 1$$\n\nz", "x is\n\n$$\ny = 1\n$$\n\nz"),
+        # text after the closing $$ moves to the next line
+        ("$$y = 1$$, so", "$$\ny = 1\n$$\n, so"),
+        # inside a list item the block keeps the indentation
+        ("- item\n\n  $$y = 1$$", "- item\n\n  $$\n  y = 1\n  $$"),
+        # $$ in the middle of a sentence is left alone
+        ("so $$y = 1$$ here", "so $$y = 1$$ here"),
         ("<br>", "<br />"),
         ('<span style="color: red">x</span>', "<span>x</span>"),
         ("a <!-- note --> b", "a  b"),
