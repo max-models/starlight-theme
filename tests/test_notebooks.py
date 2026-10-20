@@ -266,7 +266,7 @@ def test_fold_output(project, monkeypatch):
     ).read_text()
     assert "print(fig)" not in page
     assert (
-        "<details>\n<summary>TikZ &lt;code&gt;</summary>\n\n```text\n\\begin{tikzpicture}\n```\n\n</details>"
+        "<details>\n<summary>TikZ &lt;code></summary>\n\n```text\n\\begin{tikzpicture}\n```\n\n</details>"
         in page
     )
     assert (
@@ -359,3 +359,9 @@ def test_launch_buttons_off_under_mpi_or_metadata(project, monkeypatch):
     assert "launch={false}" in (content / "opted-out.mdx").read_text()
     run(project, "convert", "--mpi-ranks", "2", monkeypatch=monkeypatch)
     assert "launch={false}" in (content / "plain.mdx").read_text()
+
+
+def test_blockquotes_survive():
+    assert notebooks.sanitize_markdown("> **Note** a {b} if x < 1\n> > nested") == (
+        "> **Note** a \\{b\\} if x &lt; 1\n> > nested"
+    )

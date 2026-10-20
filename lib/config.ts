@@ -55,8 +55,14 @@ export interface DocsOptions {
 	crossref?: string[] | false;
 	/** The project's pyproject.toml, for `crossref`. Default "../pyproject.toml" (from docs/). */
 	pyproject?: string;
-	/** The "Projects" menu of the header (default the max-models projects); `false` hides it. */
+	/**
+	 * The "Projects" menu of the header: by default the list at `projectsUrl`, loaded in the
+	 * browser, with the theme's list as the fallback; a list of its own (no loading), or `false`
+	 * to hide it.
+	 */
 	projects?: Project[] | false;
+	/** The JSON list of projects the menu loads (default https://max-models.github.io/projects.json); `false` keeps the built-in one. */
+	projectsUrl?: string | false;
 	/** Buttons on the notebook pages that run the notebook in Colab or Binder. Default none. */
 	launch?: LaunchService[];
 	/** KaTeX settings: `macros` such as `{ '\\vec': '\\boldsymbol{#1}' }`, for every page. */
@@ -121,6 +127,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			versions,
 			launch: options.launch,
 			projects: options.projects,
+			projectsUrl: options.projectsUrl,
 		}),
 	];
 	if (pkg) {
@@ -136,10 +143,14 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						label: 'All modules',
 						search: ['../src'],
 						docstringStyle: 'google',
-						members: { exclude: [`${pkg}.tests`, `${pkg}.tests.*`] },
 						sourceLink: { host: 'github', repo: `${owner}/${options.repo}`, ref: sourceBranch, root: '..' },
 						sidebar: { collapsed: false },
 						...options.pydocs,
+						// a site's own excludes add to the tests, rather than replace them
+						members: {
+							...options.pydocs?.members,
+							exclude: [`${pkg}.tests`, `${pkg}.tests.*`, ...(options.pydocs?.members?.exclude ?? [])],
+						},
 					},
 				],
 				// The interpreter griffe runs in (set by `make docs-*`); falls back to uvx / python.
