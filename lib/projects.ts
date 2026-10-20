@@ -1,34 +1,33 @@
 // The max-models projects with a docs site of this theme: the "Projects" menu of the header, and
 // the API inventories a site links its annotations to (the sibling packages it depends on).
 import { existsSync, readFileSync } from 'node:fs';
+import { docsUrl, type Project } from './project-menu.ts';
 
-export interface Project {
-	/** Repository name: github.com/<owner>/<repo>, docs at <owner>.github.io/<repo>/. */
-	repo: string;
-	/** Name in the menu. */
-	title: string;
-	/** One line in the menu. */
-	description?: string;
-	/** The documented Python package (import name), if the site has an API reference. */
-	pythonPackage?: string;
-	/** Distribution name in pyproject.toml dependencies. Default: `pythonPackage`. */
-	distribution?: string;
-	/** GitHub user or organisation. Default "max-models". */
-	owner?: string;
-}
+export { docsUrl, type Project };
 
+// The fallback of the menu (without JavaScript, or when projects.json does not load) and the
+// candidates for the cross-references. The menu itself comes from projects.json in
+// max-models/max-models.github.io; keep the two in step.
 export const projects: Project[] = [
+	{ repo: 'cunumpy', title: 'cunumpy', description: 'NumPy on the CPU, CuPy on the GPU, one import', pythonPackage: 'cunumpy' },
 	{ repo: 'maybempi', title: 'maybempi', description: 'MPI when launched under MPI, a serial stand-in otherwise', pythonPackage: 'maybempi' },
 	{ repo: 'mpiarray', title: 'mpiarray', description: 'Distributed NumPy/CuPy arrays with halo exchange', pythonPackage: 'mpiarray' },
 	{ repo: 'simgeometry', title: 'simgeometry', description: 'Shapes, structured grids and domains', pythonPackage: 'simgeometry' },
 	{ repo: 'patchwork', title: 'Patchwork', description: 'Block-structured adaptive meshes', pythonPackage: 'patchwork' },
+	{ repo: 'tree-d-3d', title: 'tree-d-3d', description: 'Barnes-Hut trees and fast multipole methods for charged particles', pythonPackage: 'tree_d_3d' },
 	{ repo: 'plasmacoll', title: 'plasmacoll', description: 'Monte Carlo collisions with neutral gases', pythonPackage: 'plasmacoll' },
+	{ repo: 'picnic', title: 'picnic', description: 'Particle-in-cell tools for negative ions and other charged particles', pythonPackage: 'picnic' },
+	{ repo: 'wellbalanced', title: 'wellbalanced', description: 'Global (0D) and 1D fluid models of low-temperature plasmas', pythonPackage: 'wellbalanced' },
+	{ repo: 'freeofcharge', title: 'freeofcharge', description: 'Neutral beams in tokamak plasmas', pythonPackage: 'freeofcharge' },
+	{ repo: 'mhd-sandbox', title: 'mhd-sandbox', description: 'Finite-volume ideal MHD on a periodic 2D grid', pythonPackage: 'mhd_sandbox' },
 	{ repo: 'plasma-plots', title: 'plasma-plots', description: 'Plots of labeled xarray plasma output', pythonPackage: 'plasma_plots', distribution: 'plasma-plots' },
+	{ repo: 'maxplotlib', title: 'maxplotlib', description: 'Reproducible plots with several backends', pythonPackage: 'maxplotlib', distribution: 'maxplotlibx' },
+	{ repo: 'scope-profiler', title: 'scope-profiler', description: 'Profile code regions, optionally with LIKWID markers', pythonPackage: 'scope_profiler', distribution: 'scope-profiler' },
+	{ repo: 'scope-profiler-catalog', title: 'Profiling catalogue', description: 'Profiling runs made with scope-profiler' },
+	{ repo: 'slurm-script-generator', title: 'slurm-script-generator', description: 'Generate Slurm job scripts', pythonPackage: 'slurm_script_generator', distribution: 'slurm-script-generator' },
+	{ repo: 'gallery', owner: 'spokes3d', title: 'Magnetron gallery', description: 'Magnetron and spoke-formation studies' },
+	{ repo: 'starlight-theme', title: 'starlight-theme', description: 'The docs setup these sites share' },
 ];
-
-export function docsUrl(project: Project): string {
-	return `https://${project.owner ?? 'max-models'}.github.io/${project.repo}/`;
-}
 
 /** The Sphinx inventory starlight-pydocs serves for the project's package. */
 export function inventoryUrl(project: Project): string | undefined {

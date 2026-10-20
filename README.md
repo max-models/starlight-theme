@@ -25,7 +25,7 @@ its pages import always come in matching versions.
 In the root of a project, without installing anything first:
 
 ```sh
-npx --package github:max-models/starlight-theme#v0.3.1 starlight-theme-init
+npx --package github:max-models/starlight-theme#v0.4.0 starlight-theme-init
 cd docs && npm install
 ```
 
@@ -40,7 +40,7 @@ and swaps their dependencies in the existing `docs/package.json` for the theme.
 By hand, in `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.3.1
+npm install github:max-models/starlight-theme#v0.4.0
 ```
 
 `docs/package.json` then needs only:
@@ -49,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.3.1
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.3.1",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.4.0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -88,7 +88,8 @@ Other options:
 | `pydocs` | Overrides for the starlight-pydocs package entry |
 | `inventories` | Sphinx inventories for the API reference (default Python and NumPy) |
 | `crossref` | Sibling projects whose API reference the annotations link to, e.g. `['mpiarray']`. Default: the max-models projects among the dependencies of `pyproject` (`../pyproject.toml`); `false` for none |
-| `projects` | The "Projects" menu of the header (default the max-models projects in `lib/projects.ts`); `false` hides it |
+| `projects` | The "Projects" menu of the header: by default loaded in the browser from `projectsUrl`, with the list in `lib/projects.ts` until it loads; a list of the site's own (not loaded), or `false` to hide it |
+| `projectsUrl` | The JSON list the menu loads, default `https://max-models.github.io/projects.json`; `false` keeps the built-in list |
 | `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
 | `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page |
 | `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
@@ -110,6 +111,24 @@ Delete the copies the theme replaces: `src/components/{Header,NotebookHeader,Not
 starlight-pydocs, starlight-links-validator, @astrojs/markdown-remark and @mdx-js/mdx
 (`starlight-theme-init --migrate` does both).
 A site's own `customCss` still works and loads after the theme's.
+
+### The projects menu
+
+Every site reads the menu from [`projects.json`](https://max-models.github.io/projects.json) in
+[max-models.github.io](https://github.com/max-models/max-models.github.io) (`public/projects.json`)
+when a page loads, so a new project appears on all sites once that file is pushed, without a theme
+release or a rebuild:
+
+```json
+[
+	{ "repo": "mpiarray", "title": "mpiarray", "description": "Distributed NumPy/CuPy arrays with halo exchange" },
+	{ "repo": "gallery", "owner": "spokes3d", "title": "Magnetron gallery", "description": "Magnetron and spoke-formation studies" }
+]
+```
+
+`owner` defaults to `max-models`; the link is `https://<owner>.github.io/<repo>/`. The list in
+`lib/projects.ts` is what a page shows without JavaScript or when the file does not load, and the
+candidates of `crossref` (with `pythonPackage`); add a project there too, at the next release.
 
 ### Notebooks
 
@@ -209,7 +228,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.3.1
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.0
     with:
       smoke-paths: |
         tutorials/index.html

@@ -6,7 +6,8 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { StarlightPlugin } from '@astrojs/starlight/types';
 import type { ViteUserConfig } from 'astro';
-import { docsUrl, projects as defaultProjects, type Project } from './projects.ts';
+import { menuEntries, PROJECTS_URL, type MenuEntry, type Project } from './project-menu.ts';
+import { projects as defaultProjects } from './projects.ts';
 
 export interface NavLink {
 	label: string;
@@ -40,8 +41,14 @@ export interface ThemeOptions {
 	versions?: Versions;
 	/** "Open in Colab" / "Launch Binder" buttons on the notebook pages. Default none. */
 	launch?: LaunchService[];
-	/** The "Projects" menu of the header (default the max-models projects); `false` hides it. */
+	/**
+	 * The "Projects" menu of the header: by default the list at `projectsUrl`, loaded in the
+	 * browser, with the theme's list as the fallback; a list of its own (no loading), or `false`
+	 * to hide it.
+	 */
 	projects?: Project[] | false;
+	/** The JSON list of projects the menu loads (default https://max-models.github.io/projects.json); `false` keeps the built-in one. */
+	projectsUrl?: string | false;
 }
 
 /** What `virtual:starlight-theme/config` exports. */
@@ -51,7 +58,9 @@ export interface ThemeConfig {
 	nav: Required<NavLink>[];
 	versions: Versions | null;
 	launch: LaunchService[];
-	projects: { title: string; description: string; href: string; current: boolean }[];
+	projects: MenuEntry[];
+	/** Where the header script loads the menu from; null for none. */
+	projectsUrl: string | null;
 }
 
 const VIRTUAL_ID = 'virtual:starlight-theme/config';
@@ -82,12 +91,8 @@ export function themeConfig(options: ThemeOptions): ThemeConfig {
 		nav: (options.nav ?? []).map((link) => ({ ...link, section: link.section ?? sectionOf(link.link) })),
 		versions: options.versions ?? null,
 		launch: options.launch ?? [],
-		projects: (options.projects === false ? [] : (options.projects ?? defaultProjects)).map((project) => ({
-			title: project.title,
-			description: project.description ?? '',
-			href: docsUrl(project),
-			current: project.repo === repo && (project.owner ?? 'max-models') === owner,
-		})),
+		projects: options.projects === false ? [] : menuEntries(options.projects ?? defaultProjects, owner, repo),
+		projectsUrl: options.projects === undefined && options.projectsUrl !== false ? (options.projectsUrl ?? PROJECTS_URL) : null,
 	};
 }
 
