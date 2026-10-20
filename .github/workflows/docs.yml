@@ -19,12 +19,21 @@ name: Docs
 #           tutorials/shapes-and-node-masks/1.png
 #           api/simgeometry/index.html
 #
+# A project with dependencies in private repositories passes a token that can read them:
+#
+#       secrets:
+#         git-token: ${{ secrets.PRIVATE_REPOS_TOKEN }}
+#
 # Without stable-branch, a push to deploy-branch deploys that branch at <owner>.github.io/<repo>/.
 # With it, a push to either branch builds both and deploys stable-branch there and deploy-branch at
 # <repo>/dev/, with a stable/dev switch in the header (DOCS_CHANNEL, read by defineDocs).
 
 on:
   workflow_call:
+    secrets:
+      git-token:
+        description: A token that can read the project's private dependencies (git URLs on github.com).
+        required: false
     inputs:
       project-dir:
         description: The project root (pyproject.toml and docs/), relative to the repository.
@@ -144,6 +153,14 @@ jobs:
       - name: Install system packages
         if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }}
+
+      - name: Let git read private repositories
+        env:
+          GIT_TOKEN: ${{ secrets['git-token'] }}
+        run: |
+          if [ -n "$GIT_TOKEN" ]; then
+            git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
 
       - name: Install the project
         run: |
