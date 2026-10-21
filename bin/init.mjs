@@ -4,7 +4,7 @@
 // workflow and a Renovate config, from what it finds in the project; files that exist are left
 // alone. Without installing anything first:
 //
-//     npx --package github:max-models/starlight-theme#v0.4.0 starlight-theme-init
+//     npx --package github:max-models/starlight-theme#v0.4.1 starlight-theme-init
 //
 // --migrate moves a project from the old copied setup: removes the files the theme replaces and
 // updates the existing docs/package.json. Then `cd docs && npm install`.
