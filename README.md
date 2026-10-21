@@ -25,7 +25,7 @@ its pages import always come in matching versions.
 In the root of a project, without installing anything first:
 
 ```sh
-npx --package github:max-models/starlight-theme#v0.4.0 starlight-theme-init
+npx --package github:max-models/starlight-theme#v0.4.1 starlight-theme-init
 cd docs && npm install
 ```
 
@@ -40,7 +40,7 @@ and swaps their dependencies in the existing `docs/package.json` for the theme.
 By hand, in `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.4.0
+npm install github:max-models/starlight-theme#v0.4.1
 ```
 
 `docs/package.json` then needs only:
@@ -49,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.4.0
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.4.0",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.4.1",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -228,7 +228,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.0
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.1
     with:
       smoke-paths: |
         tutorials/index.html
@@ -247,6 +247,10 @@ release. The workflow sets `DOCS_CHANNEL=stable|dev` for `defineDocs`, which mov
 `/<repo>/dev/` together with the links of its pages that are written as `/<repo>/...`. Both
 branches must use a theme version that knows `DOCS_CHANNEL` (v0.3.0 or later) for the switch to
 show on both; the smoke paths must exist in both builds.
+
+The release branch (`stable-branch`, or `main`) and pull requests into it install the project with
+`UV_NO_SOURCES`, so from PyPI only; every other build takes the devel branches the project lists
+in `[tool.uv.sources]`.
 
 ### Renovate
 
