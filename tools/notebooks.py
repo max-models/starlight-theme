@@ -7,6 +7,7 @@
 ``convert``
     Writes ``docs/src/content/docs/<section>/<slug>.mdx`` from the executed copy, the images into
     ``docs/public/<section>/<slug>/`` and a downloadable copy of the notebook next to them.
+    The pages and assets of deleted notebooks are removed.
     Notebooks that have not been executed, or changed since, are converted without outputs
     (``--strict`` fails on them, and on notebooks whose run raised).
 ``clean``
@@ -33,6 +34,12 @@ default "Show output"), ``remove-output``, ``raises-exception``, ``notebook-grid
 ``grid``), and nbclient's ``skip-execution`` (shown, not run). Notebook metadata ``docs_order``
 sets the sidebar order (else ``index`` first, then by file name), and ``docs_launch: false`` hides
 the site's Colab/Binder buttons (as do ``mpiRanks`` > 1).
+
+Outputs: images become files next to the page (NotebookImage), HTML and SVG are inlined (RawHtml).
+An output whose metadata has a ``"pyvista-scene"`` dict (optional ``alt`` and ``title``) is a 3-D
+PyVista scene: its ``text/html`` (the standalone page of ``plotter.trame.export_html``) and
+``image/png`` go to ``<n>.html`` and ``<n>.png`` next to the images, shown by PyVistaScene as the
+picture with a button that loads the interactive scene.
 
 Usage: starlight-notebooks <execute|convert|clean> [options]   (in docs/, or with --docs)
 """
@@ -426,6 +433,29 @@ def merge_streams(outputs: list[dict]) -> list[dict]:
 _IMAGES = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif"}
 
 
+def convert_scene(data: dict, scene: dict, page: Page) -> str:
+    """A 3-D PyVista scene: its standalone HTML and PNG next to the images, shown by PyVistaScene."""
+    scene = scene if isinstance(scene, dict) else {}
+    image_url = None
+    if "image/png" in data:  # <n>.png, and the scene next to it as <n>.html
+        image, image_url = page.asset(".png")
+        image.write_bytes(base64.b64decode(_text(data["image/png"])))
+        page.thumbnail = page.thumbnail or image_url
+        path, url = image.with_suffix(".html"), image_url.removesuffix(".png") + ".html"
+    else:
+        path, url = page.asset(".html")
+    path.write_text(_text(data["text/html"]), encoding="utf-8")
+    props = [f'src="{url}"']
+    if image_url:
+        props.append(f'image="{image_url}"')
+    alt = scene.get("alt") or scene.get("title") or "A 3-D scene"
+    props.append(f"alt={{{json.dumps(str(alt), ensure_ascii=False)}}}")
+    if scene.get("title"):
+        props.append(f"title={{{json.dumps(str(scene['title']), ensure_ascii=False)}}}")
+    page.components.add("PyVistaScene")
+    return f"<PyVistaScene {' '.join(props)} />"
+
+
 def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str:
     kind = output.get("output_type")
     if kind == "stream":
@@ -437,6 +467,9 @@ def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str
             )
         return _fence(_ANSI.sub("", "\n".join(output.get("traceback", []))))
     data = output.get("data", {})
+    scene = output.get("metadata", {}).get("pyvista-scene")
+    if scene is not None and "text/html" in data:
+        return convert_scene(data, scene, page)
     mime = next((mime for mime in _IMAGES if mime in data), None)
     if mime is not None:  # a GIF is an animation, e.g. from IPython.display.Image
         path, url = page.asset(_IMAGES[mime])
@@ -634,6 +667,11 @@ def cmd_convert(settings: Settings, args: argparse.Namespace) -> None:
     for stale in settings.content.glob("*.mdx"):
         if stale.name not in expected:
             stale.unlink()
+    # and their images and scenes (each page replaces its own directory when converted)
+    slugs = {slug_of(path) for path in sources}
+    for stale in settings.public.glob("*/") if settings.public.exists() else []:
+        if stale.is_dir() and stale.name not in slugs:
+            shutil.rmtree(stale)
     problems = []
 
     def convert(source: Path, order: int, cards: list[dict] | None = None) -> dict:

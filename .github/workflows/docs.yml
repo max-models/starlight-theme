@@ -12,7 +12,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.1
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -66,6 +66,10 @@ on:
         default: true
       gallery:
         description: Run the example scripts and convert them into the gallery (failing on errors).
+        type: boolean
+        default: false
+      xvfb:
+        description: Run the notebooks and gallery examples under a virtual display (xvfb), e.g. for PyVista scenes.
         type: boolean
         default: false
       pre-build:
@@ -157,8 +161,8 @@ jobs:
           cache-dependency-path: ${{ inputs.npm-lockfile }}
 
       - name: Install system packages
-        if: inputs.apt-packages != ''
-        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }}
+        if: inputs.apt-packages != '' || inputs.xvfb
+        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }} ${{ inputs.xvfb && 'xvfb libgl1 libglx-mesa0' || '' }}
 
       - name: Let git read private repositories
         env:
@@ -180,15 +184,19 @@ jobs:
       - name: Execute and convert the notebooks
         if: inputs.notebooks
         working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
         run: |
-          npx starlight-notebooks execute
+          $RUN npx starlight-notebooks execute
           npx starlight-notebooks convert --strict
 
       - name: Run and convert the gallery examples
         if: inputs.gallery
         working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
         run: |
-          npx starlight-gallery execute
+          $RUN npx starlight-gallery execute
           npx starlight-gallery convert --strict
 
       - name: Project-specific steps

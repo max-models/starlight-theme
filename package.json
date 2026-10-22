@@ -1,6 +1,6 @@
 {
   "name": "@max-models/starlight-theme",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "The shared Astro + Starlight docs setup of the max-models projects: config, header, palette, notebook pages.",
   "license": "MIT",
   "type": "module",

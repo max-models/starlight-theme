@@ -6,7 +6,7 @@ description: Use the theme in a project's docs.
 In the project's `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.4.1
+npm install github:max-models/starlight-theme#v0.5.0
 ```
 
 `docs/astro.config.mjs` then only holds what is particular to the project:
@@ -37,5 +37,5 @@ $$
 Macros from the `math` option of `defineDocs` work everywhere too: this site defines `\vect`, so
 `$\vect{E} = -\nabla \phi$` is $\vect{E} = -\nabla \phi$.
 
-Or start from scratch: `npx --package github:max-models/starlight-theme#v0.4.1 starlight-theme-init`
+Or start from scratch: `npx --package github:max-models/starlight-theme#v0.5.0 starlight-theme-init`
 in the root of the project writes the whole `docs/` setup.

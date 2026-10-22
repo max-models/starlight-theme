@@ -1,0 +1,152 @@
+---
+// A static picture of a 3-D PyVista scene that is swapped for the interactive scene on click: a
+// standalone HTML page with vtk.js inlined, from `plotter.trame.export_html(...)`. The scene is only
+// fetched then, as each is a few MB. Written by the starlight-notebooks tool for a cell output with
+// "pyvista-scene" metadata, or used directly in MDX with an imported image.
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+import { withBase } from '../utils/base';
+
+export interface Props {
+	/** Site-root path of the scene HTML under public/, e.g. "/pyvista/torus.html". */
+	src: string;
+	/** The static picture: an imported image, or the site-root path of one under public/. */
+	image?: ImageMetadata | string;
+	alt?: string;
+	/** A caption above the buttons, also the title of the interactive frame. */
+	title?: string;
+}
+const { src, image, alt = 'A 3-D scene', title } = Astro.props;
+const resolved = withBase(src);
+let size = '';
+try {
+	size = ` (${(statSync(join(process.cwd(), 'public', src)).size / 1e6).toFixed(1)} MB)`;
+} catch {
+	// the scene was not generated (e.g. no trame in the docs environment): only the picture is shown
+}
+const available = size !== '';
+const ratio = image && typeof image !== 'string' ? `aspect-ratio: ${image.width} / ${image.height}` : undefined;
+---
+
+<figure class="pyvista-scene">
+	<div class="pyvista-view" data-src={resolved} data-title={title ?? alt} style={ratio}>
+		{
+			image === undefined ? (
+				<span class="pyvista-placeholder">{alt}</span>
+			) : typeof image === 'string' ? (
+				<img src={withBase(image)} alt={alt} loading="lazy" />
+			) : (
+				<Image src={image} alt={alt} />
+			)
+		}
+	</div>
+	{
+		(available || title) && (
+			<figcaption class="pyvista-caption not-content">
+				{title && <span class="pyvista-title">{title}</span>}
+				{available && (
+					<>
+						<button class="pyvista-open" type="button">
+							Interactive 3-D view{size}
+						</button>
+						<span class="pyvista-hint" hidden>
+							Drag to rotate, scroll to zoom, shift-drag to pan.
+						</span>
+						<a class="pyvista-tab" href={resolved} target="_blank" rel="noopener">
+							Open in a new tab
+						</a>
+					</>
+				)}
+			</figcaption>
+		)
+	}
+</figure>
+
+<style>
+	.pyvista-scene {
+		margin-block: 1.5rem;
+	}
+	.pyvista-view {
+		position: relative;
+		width: 100%;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.5rem;
+		overflow: hidden;
+		/* scene screenshots have their own background; keep it in both themes */
+		background: white;
+	}
+	.pyvista-view :global(img),
+	.pyvista-view :global(iframe) {
+		display: block;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		border: 0;
+		object-fit: contain;
+	}
+	.pyvista-placeholder {
+		display: grid;
+		place-items: center;
+		aspect-ratio: 4 / 3;
+		color: var(--sl-color-gray-3);
+		background: var(--sl-color-bg-inline-code);
+		font-size: var(--sl-text-sm);
+	}
+	.pyvista-caption {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem 1rem;
+		margin-top: 0.6rem;
+		color: var(--sl-color-gray-3);
+		font-size: var(--sl-text-sm);
+	}
+	.pyvista-title {
+		color: var(--sl-color-text);
+	}
+	.pyvista-open {
+		padding: 0.35rem 0.9rem;
+		border: 1px solid var(--sl-color-text-accent);
+		border-radius: 999px;
+		background: var(--sl-color-text-accent);
+		color: var(--sl-color-text-invert);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.pyvista-open:hover,
+	.pyvista-open:focus-visible {
+		filter: brightness(1.1);
+	}
+	.pyvista-tab {
+		color: var(--sl-color-text-accent);
+	}
+</style>
+
+<script>
+	function mountAll() {
+		document.querySelectorAll<HTMLElement>('.pyvista-scene').forEach((figure) => {
+			const view = figure.querySelector<HTMLElement>('.pyvista-view')!;
+			const button = figure.querySelector<HTMLButtonElement>('.pyvista-open');
+			if (!button || button.dataset.bound === 'true') return;
+			button.dataset.bound = 'true';
+			button.addEventListener('click', () => {
+				// keep the picture's shape, also for an image from public/ whose size is not known at build time
+				const img = view.querySelector('img');
+				if (!view.style.aspectRatio && img?.naturalWidth) view.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+				if (!view.style.aspectRatio) view.style.aspectRatio = '4 / 3';
+				const iframe = document.createElement('iframe');
+				iframe.src = view.dataset.src!;
+				iframe.title = view.dataset.title ?? 'Interactive 3-D scene';
+				view.replaceChildren(iframe);
+				button.hidden = true;
+				figure.querySelector<HTMLElement>('.pyvista-hint')!.hidden = false;
+			});
+		});
+	}
+
+	mountAll();
+	document.addEventListener('astro:page-load', mountAll);
+</script>
