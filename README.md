@@ -10,7 +10,7 @@ when it bumps its version.
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
 | `theme()` Starlight plugin | The palette, a header with a row of section links, a stable/dev switch and a projects menu, the KaTeX styles, the favicon. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`: Starlight's, replaced |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
@@ -25,7 +25,7 @@ its pages import always come in matching versions.
 In the root of a project, without installing anything first:
 
 ```sh
-npx --package github:max-models/starlight-theme#v0.4.1 starlight-theme-init
+npx --package github:max-models/starlight-theme#v0.5.0 starlight-theme-init
 cd docs && npm install
 ```
 
@@ -40,7 +40,7 @@ and swaps their dependencies in the existing `docs/package.json` for the theme.
 By hand, in `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.4.1
+npm install github:max-models/starlight-theme#v0.5.0
 ```
 
 `docs/package.json` then needs only:
@@ -49,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.4.1
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.4.1",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.5.0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -156,6 +156,57 @@ set, the pages get "Open in Colab" / "Launch Binder" buttons, except for noteboo
 MPI ranks or with the metadata `docs_launch: false`. See the docstring of `tools/notebooks.py` for
 the rest.
 
+#### Interactive 3-D scenes
+
+A cell can show a PyVista scene that the reader can rotate: the page shows a picture of it and an
+**Interactive 3-D view** button (with the download size) that loads the scene, a standalone vtk.js
+page, only when clicked, as each is a few MB; "Open in a new tab" opens it on its own. With
+plasma-plots, the last line of the cell is
+
+```python
+plasma_plots.scene(plotter, alt="Isosurfaces of a helical mode in a torus")
+```
+
+Any project can produce one: an output (`display_data` or `execute_result`) is a scene when its
+metadata has the key `"pyvista-scene"`, with `text/html` the standalone page of
+`plotter.trame.export_html(...)` and `image/png` a screenshot of it. Display an object whose
+`_repr_mimebundle_` returns both:
+
+```python
+import base64, tempfile
+from pathlib import Path
+
+class Scene:
+    def __init__(self, plotter, alt=None, title=None):
+        self.plotter, self.alt, self.title = plotter, alt, title
+
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.plotter.screenshot(f"{tmp}/scene.png")
+            self.plotter.trame.export_html(f"{tmp}/scene.html")  # needs trame and trame-vtk
+            png = base64.b64encode(Path(tmp, "scene.png").read_bytes()).decode()
+            html = Path(tmp, "scene.html").read_text()
+        data = {"text/html": html, "image/png": png}
+        return data, {"pyvista-scene": {"alt": self.alt, "title": self.title}}
+```
+
+`alt` is the alt text of the picture (default the `title`), `title` an optional caption. The
+tool writes the scene and the picture as `<n>.html` and `<n>.png` next to the page's images in
+`public/<section>/<slug>/`; like the images, they are replaced at every conversion and removed with
+the page when its notebook is deleted. Elsewhere in a site, the component works directly in MDX,
+with a scene under `public/` and an imported picture:
+
+```mdx
+import PyVistaScene from '@max-models/starlight-theme/components/PyVistaScene.astro';
+import torus from '../../assets/figures/torus.png';
+
+<PyVistaScene src="/pyvista/torus.html" image={torus} alt="Isosurfaces in a torus" />
+```
+
+`src` is the site-root path of the HTML under `public/` (the base path is added), `image` an
+imported image or the site-root path of one under `public/`. Without the HTML file only the picture
+is shown, so a build without trame still works.
+
 ### Gallery
 
 `starlight-gallery <execute|convert|clean>` builds a gallery from plain Python scripts in `examples/`
@@ -228,7 +279,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.1
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
     with:
       smoke-paths: |
         tutorials/index.html
@@ -236,7 +287,8 @@ jobs:
 ```
 
 Inputs: `extras` (default `docs`; e.g. `docs mpi`), `apt-packages` (e.g.
-`libopenmpi-dev openmpi-bin`), `notebooks`, `gallery`, `pre-build` (shell commands before the build, e.g.
+`libopenmpi-dev openmpi-bin`), `notebooks`, `gallery`, `xvfb` (run them under a virtual display, for
+PyVista scenes), `pre-build` (shell commands before the build, e.g.
 tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`), `stable-branch`,
 `python-version`, `node-version`, `project-dir`, `npm-lockfile`.
 

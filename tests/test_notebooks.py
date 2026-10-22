@@ -150,12 +150,15 @@ def test_convert_executed_notebook(project, monkeypatch):
     stale = project / "docs" / "src" / "content" / "docs" / "guides" / "deleted.mdx"
     stale.parent.mkdir(parents=True)
     stale.write_text("")
+    stale_public = project / "docs" / "public" / "guides" / "deleted"
+    stale_public.mkdir(parents=True)
+    (stale_public / "1.html").write_text("")
 
     with pytest.raises(SystemExit):  # the uncaught error in the last cell
         run(project, "convert", "--strict", monkeypatch=monkeypatch)
 
     page = (stale.parent / "my-guide.mdx").read_text()
-    assert not stale.exists()
+    assert not stale.exists() and not stale_public.exists()
     assert 'title: "The title"' in page
     assert 'description: "A description that is long enough to be used."' in page
     assert "  order: 7" in page
@@ -181,6 +184,103 @@ def test_convert_executed_notebook(project, monkeypatch):
         "2.gif",
         "my_guide.ipynb",
     ]
+
+
+SCENE_HTML = ["<!DOCTYPE html>\n", "<html><body>vtk.js scene</body></html>\n"]
+
+
+def test_pyvista_scene(project, monkeypatch):
+    v4 = nbformat.v4
+    scene = v4.new_output(
+        "display_data",
+        data={"text/html": SCENE_HTML, "image/png": PNG, "text/plain": "<Scene>"},
+        metadata={"pyvista-scene": {"alt": 'A "torus" {with} braces'}},
+    )
+    titled = v4.new_output(
+        "execute_result",
+        data={"text/html": "<html>second</html>", "image/png": PNG},
+        metadata={"pyvista-scene": {"title": "Field lines"}},
+    )
+    cells = [
+        v4.new_markdown_cell("# Scenes"),
+        v4.new_code_cell(
+            "plot()", outputs=[v4.new_output("display_data", data={"image/png": PNG})]
+        ),
+        v4.new_code_cell("scene(plotter)", outputs=[scene, titled]),
+        v4.new_code_cell(
+            "table()",
+            outputs=[
+                v4.new_output("display_data", data={"text/html": "<table></table>"})
+            ],
+        ),
+    ]
+    write_notebook(project / "guides" / "scenes.ipynb", cells)
+    cache = project / "docs" / ".cache" / "notebooks"
+    cache.mkdir(parents=True)
+    write_notebook(cache / "scenes.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+
+    content = project / "docs" / "src" / "content" / "docs" / "guides"
+    page = (content / "scenes.mdx").read_text()
+    assert (
+        "import PyVistaScene from '@max-models/starlight-theme/components/PyVistaScene.astro';"
+        in page
+    )
+    assert (
+        '<PyVistaScene src="/guides/scenes/2.html" image="/guides/scenes/2.png" '
+        'alt={"A \\"torus\\" {with} braces"} />' in page
+    )
+    assert (
+        '<PyVistaScene src="/guides/scenes/3.html" image="/guides/scenes/3.png" '
+        'alt={"Field lines"} title={"Field lines"} />' in page
+    )
+    assert "vtk.js scene" not in page  # the scene is a file, not inlined
+    assert '<RawHtml html={"<table></table>"} />' in page  # other HTML still is
+    public = project / "docs" / "public" / "guides" / "scenes"
+    assert sorted(p.name for p in public.iterdir()) == [
+        "1.png",
+        "2.html",
+        "2.png",
+        "3.html",
+        "3.png",
+        "scenes.ipynb",
+    ]
+    assert (public / "2.html").read_text() == "".join(SCENE_HTML)
+    assert (public / "2.png").read_bytes() == base64.b64decode(PNG)
+
+    # a later conversion without the scenes leaves none of their files behind
+    cells[2] = v4.new_code_cell("scene(plotter)")
+    write_notebook(project / "guides" / "scenes.ipynb", cells)
+    write_notebook(cache / "scenes.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+    assert "PyVistaScene" not in (content / "scenes.mdx").read_text()
+    assert sorted(p.name for p in public.iterdir()) == ["1.png", "scenes.ipynb"]
+
+
+def test_pyvista_scene_without_picture(project, monkeypatch):
+    v4 = nbformat.v4
+    cells = [
+        v4.new_code_cell(
+            "scene(plotter)",
+            outputs=[
+                v4.new_output(
+                    "display_data",
+                    data={"text/html": "<html></html>"},
+                    metadata={"pyvista-scene": {}},
+                )
+            ],
+        )
+    ]
+    write_notebook(project / "guides" / "bare.ipynb", cells)
+    cache = project / "docs" / ".cache" / "notebooks"
+    cache.mkdir(parents=True)
+    write_notebook(cache / "bare.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+    page = (
+        project / "docs" / "src" / "content" / "docs" / "guides" / "bare.mdx"
+    ).read_text()
+    assert '<PyVistaScene src="/guides/bare/1.html" alt={"A 3-D scene"} />' in page
+    assert (project / "docs" / "public" / "guides" / "bare" / "1.html").exists()
 
 
 def test_changed_notebook_is_not_run(project, monkeypatch):
