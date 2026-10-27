@@ -316,6 +316,31 @@ def _escape_text(text: str) -> str:
     return "".join(out)
 
 
+def _starts_line(text: str, start: int) -> bool:
+    """Whether only spaces or tabs come before ``start`` on its line."""
+    line_start = text.rfind("\n", 0, start) + 1
+    return text[line_start:start].strip(" \t") == ""
+
+
+def _fence_display(text: str, match: re.Match) -> str:
+    """``$$ ... $$`` starting a line, as a math block with ``$$`` on lines of their own.
+
+    remark-math opens a block at a line that starts with ``$$`` and closes it only at a
+    line that is ``$$`` alone, so ``$$x\n+ y.$$`` would never close and swallow the
+    rest of the page, and a one-line ``$$x$$`` renders as inline math. The block keeps
+    the line's indentation (a list item's, say); text after the closing ``$$`` moves to
+    the next line.
+    """
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    indent = text[line_start : match.start()]
+    body = match.group(0)[2:-2].strip()
+    lines = "\n".join(indent + line.strip() for line in body.splitlines())
+    fenced = "$$\n" + lines + "\n" + indent + "$$"
+    line_end = text.find("\n", match.end())
+    rest = text[match.end() : line_end if line_end != -1 else len(text)]
+    return fenced + ("\n" + indent if rest.strip() else "")
+
+
 def sanitize_markdown(text: str) -> str:
     """Make notebook markdown valid MDX, keeping code and math as they are."""
     out = []
@@ -323,7 +348,9 @@ def sanitize_markdown(text: str) -> str:
     for match in _PROTECTED.finditer(text):
         out.append(_escape_text(text[position : match.start()]))
         chunk = match.group(0)
-        if match.group("bracket"):
+        if match.group("display") and _starts_line(text, match.start()):
+            out.append(_fence_display(text, match))
+        elif match.group("bracket"):
             out.append("\n$$\n" + chunk[2:-2].strip() + "\n$$\n")
         elif match.group("paren"):
             out.append("$" + chunk[2:-2].strip() + "$")
