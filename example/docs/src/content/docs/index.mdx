@@ -20,8 +20,9 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="Config" icon="setting">`defineDocs` writes the Astro config: base path, math, API reference, link check.</Card>
-  <Card title="Look" icon="star">The paper/ink palette with a teal accent and a header with section links.</Card>
+  <Card title="Look" icon="star">The paper/ink palette with a teal accent, a header with section links, and this header picture, drawn anew for each site.</Card>
   <Card title="Notebooks" icon="open-book">`starlight-notebooks` executes notebooks and turns them into pages.</Card>
+  <Card title="Gallery" icon="seti:image">`starlight-gallery` runs example scripts and shows their figures in a grid.</Card>
 </CardGrid>
 
 ## Start here
@@ -29,5 +30,6 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 <CardGrid>
   <LinkCard title="Installation" href="/starlight-theme/getting-started/installation/" description="Use the theme in a project." />
   <LinkCard title="Tutorials" href="/starlight-theme/tutorials/" description="A converted notebook." />
+  <LinkCard title="Gallery" href="/starlight-theme/examples/" description="Figures from example scripts." />
   <LinkCard title="API reference" href="/starlight-theme/api/example_pkg/" description="Generated from the docstrings." />
 </CardGrid>

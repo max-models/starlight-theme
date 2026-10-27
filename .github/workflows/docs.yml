@@ -12,12 +12,20 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.4.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
 #           tutorials/shapes-and-node-masks/1.png
 #           api/simgeometry/index.html
+#
+# A project with dependencies in private repositories passes a token that can read them:
+#
+#       secrets:
+#         git-token: ${{ secrets.PRIVATE_REPOS_TOKEN }}
+#
+# The release branch (stable-branch, or main) and pull requests into it install the project with
+# UV_NO_SOURCES, i.e. from PyPI only; every other build uses the project's [tool.uv.sources].
 #
 # Without stable-branch, a push to deploy-branch deploys that branch at <owner>.github.io/<repo>/.
 # With it, a push to either branch builds both and deploys stable-branch there and deploy-branch at
@@ -25,6 +33,10 @@ name: Docs
 
 on:
   workflow_call:
+    secrets:
+      git-token:
+        description: A token that can read the project's private dependencies (git URLs on github.com).
+        required: false
     inputs:
       project-dir:
         description: The project root (pyproject.toml and docs/), relative to the repository.
@@ -54,6 +66,10 @@ on:
         default: true
       gallery:
         description: Run the example scripts and convert them into the gallery (failing on errors).
+        type: boolean
+        default: false
+      xvfb:
+        description: Run the notebooks and gallery examples under a virtual display (xvfb), e.g. for PyVista scenes.
         type: boolean
         default: false
       pre-build:
@@ -125,6 +141,9 @@ jobs:
       DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
       DOCS_CHANNEL: ${{ matrix.channel }}
       DOCS_STABLE_BRANCH: ${{ inputs.stable-branch }}
+      # The release branch (stable-branch, else main) builds against PyPI only; anything else uses
+      # the [tool.uv.sources] devel branches. The caller's env does not reach a reusable workflow.
+      UV_NO_SOURCES: ${{ (matrix.ref || github.base_ref || github.ref_name) == (inputs.stable-branch || 'main') }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -142,8 +161,16 @@ jobs:
           cache-dependency-path: ${{ inputs.npm-lockfile }}
 
       - name: Install system packages
-        if: inputs.apt-packages != ''
-        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }}
+        if: inputs.apt-packages != '' || inputs.xvfb
+        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }} ${{ inputs.xvfb && 'xvfb libgl1 libglx-mesa0' || '' }}
+
+      - name: Let git read private repositories
+        env:
+          GIT_TOKEN: ${{ secrets['git-token'] }}
+        run: |
+          if [ -n "$GIT_TOKEN" ]; then
+            git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
 
       - name: Install the project
         run: |
@@ -157,15 +184,19 @@ jobs:
       - name: Execute and convert the notebooks
         if: inputs.notebooks
         working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
         run: |
-          npx starlight-notebooks execute
+          $RUN npx starlight-notebooks execute
           npx starlight-notebooks convert --strict
 
       - name: Run and convert the gallery examples
         if: inputs.gallery
         working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
         run: |
-          npx starlight-gallery execute
+          $RUN npx starlight-gallery execute
           npx starlight-gallery convert --strict
 
       - name: Project-specific steps
