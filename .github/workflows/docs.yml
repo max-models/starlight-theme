@@ -205,6 +205,9 @@ jobs:
 
       - name: Build the site
         working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          # the latest release for the badge of the home page, from the GitHub API
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           npx starlight-check-mdx
           npx astro build

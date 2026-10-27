@@ -1,0 +1,52 @@
+---
+// Starlight's site title, with the max-models wave before it when the site sets no `logo` of its own
+// (the theme plugin replaces SiteTitle with this one).
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import theme from 'virtual:starlight-theme/config';
+
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+{
+	theme.logo ? (
+		<a href={siteTitleHref} class="site-title sl-flex">
+			<svg class="wave" viewBox="0 0 32 32" aria-hidden="true">
+				<rect width="32" height="32" rx="7" />
+				<path d="M5 17.5c2.75-7 5.5-7 8.25 0s5.5 7 8.25 0 3.67-4.67 5.5-3.5" />
+			</svg>
+			<span translate="no">{siteTitle}</span>
+		</a>
+	) : (
+		<Default />
+	)
+}
+
+<style>
+	.site-title {
+		align-items: center;
+		gap: 0.6rem;
+		font-size: var(--sl-text-h4);
+		font-weight: 600;
+		color: var(--sl-color-text-accent);
+		text-decoration: none;
+		white-space: nowrap;
+		min-width: 0;
+	}
+	span {
+		overflow: hidden;
+	}
+	.wave {
+		flex-shrink: 0;
+		width: 1.75rem;
+		height: 1.75rem;
+	}
+	.wave rect {
+		fill: var(--sl-color-accent);
+	}
+	.wave path {
+		fill: none;
+		stroke: var(--sl-color-text-invert);
+		stroke-width: 3;
+		stroke-linecap: round;
+	}
+</style>

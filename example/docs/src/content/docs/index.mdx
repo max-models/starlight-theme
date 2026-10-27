@@ -2,6 +2,7 @@
 title: starlight-theme
 description: The shared docs setup of the max-models projects.
 template: splash
+heroInstall: npx --package github:max-models/starlight-theme starlight-theme-init
 hero:
   tagline: One Astro + Starlight setup for the docs of the max-models projects, shown here on a small example package.
   actions:
@@ -14,7 +15,8 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
 
 ## What the theme brings
 
@@ -27,9 +29,4 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Start here
 
-<CardGrid>
-  <LinkCard title="Installation" href="/starlight-theme/getting-started/installation/" description="Use the theme in a project." />
-  <LinkCard title="Tutorials" href="/starlight-theme/tutorials/" description="A converted notebook." />
-  <LinkCard title="Gallery" href="/starlight-theme/examples/" description="Figures from example scripts." />
-  <LinkCard title="API reference" href="/starlight-theme/api/example_pkg/" description="Generated from the docstrings." />
-</CardGrid>
+<StartHere />

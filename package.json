@@ -52,8 +52,10 @@
     "plotly.js-dist-min": "^4.1.2",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
+    "sharp": "^0.35.3",
     "starlight-links-validator": "^0.27.0",
-    "starlight-pydocs": "0.3.0"
+    "starlight-pydocs": "0.3.0",
+    "yaml": "^2.9.1"
   },
   "peerDependencies": {
     "@astrojs/starlight": ">=0.42.6",
@@ -65,7 +67,6 @@
   "devDependencies": {
     "@astrojs/starlight": "^0.42.6",
     "astro": "^7.3.8",
-    "vitest": "^5.0.5",
-    "yaml": "^2.9.1"
+    "vitest": "^5.0.5"
   }
 }

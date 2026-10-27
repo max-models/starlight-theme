@@ -10,7 +10,7 @@
 //
 // DOCS_CHANNEL=stable|dev (set by the docs workflow when it builds both) serves the dev build at
 // <repo>/dev/ and adds a stable/dev switch; the stable build links its sources to DOCS_STABLE_BRANCH.
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import type { StarlightUserConfig } from '@astrojs/starlight/types';
@@ -19,6 +19,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightPydocs, { pydocsSidebarGroup, type PydocsPackageInput, type PydocsUserConfig } from 'starlight-pydocs';
+import { readCitation, readLicense } from './citation.ts';
 import theme, { type LaunchService, type NavLink, type Versions } from './plugin.ts';
 import { dependencyProjects, inventoryUrl, projects as defaultProjects, type Project } from './projects.ts';
 import { rehypeRebase } from './rebase.ts';
@@ -53,7 +54,7 @@ export interface DocsOptions {
 	 * to. Default: those in the dependencies of `pyproject`; `false` for none.
 	 */
 	crossref?: string[] | false;
-	/** The project's pyproject.toml, for `crossref`. Default "../pyproject.toml" (from docs/). */
+	/** The project's pyproject.toml, for `crossref`; CITATION.cff and LICENSE are read next to it. Default "../pyproject.toml" (from docs/). */
 	pyproject?: string;
 	/**
 	 * The "Projects" menu of the header: by default the list at `projectsUrl`, loaded in the
@@ -67,8 +68,15 @@ export interface DocsOptions {
 	launch?: LaunchService[];
 	/** KaTeX settings: `macros` such as `{ '\\vec': '\\boldsymbol{#1}' }`, for every page. */
 	math?: { macros?: Record<string, string> };
-	/** Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`. */
-	logo?: StarlightUserConfig['logo'];
+	/** Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; the wave of the theme when unset, `false` for none. */
+	logo?: StarlightUserConfig['logo'] | false;
+	/**
+	 * The latest release in the hero: from the GitHub releases, or from PyPI with `pypi` (the
+	 * distribution, which may differ from the import name); `false` for no badge.
+	 */
+	release?: { pypi?: string } | false;
+	/** The share image for link previews (`<base>/og.png`). Default true. */
+	shareImage?: boolean;
 	/** Merged over the Starlight config (plugins are appended to the theme's). */
 	starlight?: Partial<StarlightUserConfig>;
 	/**
@@ -118,6 +126,8 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	const sourceBranch = versions?.current === 'stable' ? (process.env.DOCS_STABLE_BRANCH || 'main') : branch;
 	const github = `https://github.com/${owner}/${options.repo}`;
 	const pkg = options.pythonPackage;
+	const pyproject = resolve(options.pyproject ?? '../pyproject.toml');
+	const root = dirname(pyproject);
 
 	const plugins: NonNullable<StarlightUserConfig['plugins']> = [
 		theme({
@@ -128,6 +138,11 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			launch: options.launch,
 			projects: options.projects,
 			projectsUrl: options.projectsUrl,
+			release: options.release,
+			logo: options.logo !== false,
+			citation: readCitation(root),
+			license: readLicense(root, github, sourceBranch),
+			shareImage: options.shareImage,
 		}),
 	];
 	if (pkg) {
