@@ -10,7 +10,7 @@ when it bumps its version.
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
 | `theme()` Starlight plugin | The palette, a header with a row of section links, a stable/dev switch and a projects menu, the KaTeX styles, the favicon. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`: Starlight's, replaced |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`, `Hero`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
@@ -111,6 +111,22 @@ Delete the copies the theme replaces: `src/components/{Header,NotebookHeader,Not
 starlight-pydocs, starlight-links-validator, @astrojs/markdown-remark and @mdx-js/mdx
 (`starlight-theme-init --migrate` does both).
 A site's own `customCss` still works and loads after the theme's.
+
+### The home page
+
+A page with a `hero` in its frontmatter (the home page, `template: splash`) shows it on a header
+picture across the whole width: streamlines of the flow past a cylinder in the accent colour, placed
+differently on each site (seeded by the site title). `heroBackground` in the frontmatter replaces it
+with an image of the site's own, or removes it:
+
+```yaml
+heroBackground: ../../assets/header.png
+# or a pair: heroBackground: { dark: ../../assets/header-dark.png, light: ../../assets/header-light.png }
+# or none:   heroBackground: false
+```
+
+On wide screens the picture fades out behind the title on the left. `hero.image` still shows an
+image beside the title, as in Starlight.
 
 ### The projects menu
 

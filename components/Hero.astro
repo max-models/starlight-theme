@@ -1,0 +1,226 @@
+---
+// Starlight's hero (the `hero` frontmatter of a home page) on a header picture across the whole
+// width: by default streamlines of the flow past a cylinder in the accent colour, a different one per
+// site (seeded by the site title); `heroBackground` in the frontmatter sets an image of the site's
+// own instead, or `false` for none. The theme plugin replaces Hero with this one.
+import { Image } from 'astro:assets';
+import config from 'virtual:starlight/user-config';
+import DraftContentNotice from 'virtual:starlight/components/DraftContentNotice';
+import { LinkButton } from '@astrojs/starlight/components';
+import { heroPattern } from '../lib/hero-pattern.ts';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, image, actions = [] } = data.hero || {};
+const background = (data as { heroBackground?: ImageMetadata | { dark: ImageMetadata; light: ImageMetadata } | false })
+	.heroBackground;
+
+const imageAttrs = {
+	loading: 'eager' as const,
+	decoding: 'async' as const,
+	width: 400,
+	height: 400,
+	alt: image?.alt || '',
+};
+
+let darkImage: ImageMetadata | undefined;
+let lightImage: ImageMetadata | undefined;
+let rawHtml: string | undefined;
+if (image) {
+	if ('file' in image) {
+		darkImage = image.file;
+	} else if ('dark' in image) {
+		darkImage = image.dark;
+		lightImage = image.light;
+	} else {
+		rawHtml = image.html;
+	}
+}
+
+const siteTitle = typeof config.title === 'string' ? config.title : Object.values(config.title)[0];
+const pattern = background === undefined ? heroPattern(siteTitle ?? data.title) : undefined;
+const backgrounds = background ? ('dark' in background ? [background.dark, background.light] : [background]) : [];
+---
+
+<div class:list={['hero', { 'has-backdrop': background !== false }]}>
+	{
+		background !== false && (
+			<div class="backdrop" aria-hidden="true">
+				{pattern && (
+					<svg class="streamlines" viewBox={`0 0 ${pattern.width} ${pattern.height}`} preserveAspectRatio="xMidYMid slice">
+						<g fill="none" stroke-width="1.5">
+							{pattern.lines.map((line) => (
+								<path d={line.d} stroke-opacity={line.opacity} />
+							))}
+						</g>
+						<circle class="cylinder" cx={pattern.circle.cx} cy={pattern.circle.cy} r={pattern.circle.r} />
+						{pattern.dots.map((dot) => (
+							<circle class="tracer" cx={dot.cx} cy={dot.cy} r="4" />
+						))}
+					</svg>
+				)}
+				{backgrounds.map((file, index) => (
+					<Image
+						src={file}
+						alt=""
+						loading="eager"
+						widths={[800, 1600, 2400]}
+						sizes="100vw"
+						class:list={[
+							'backdrop-image',
+							{ 'light:sl-hidden': backgrounds.length > 1 && index === 0, 'dark:sl-hidden': index === 1 },
+						]}
+					/>
+				))}
+			</div>
+		)
+	}
+	{darkImage && <Image src={darkImage} {...imageAttrs} class:list={['side', { 'light:sl-hidden': Boolean(lightImage) }]} />}
+	{lightImage && <Image src={lightImage} {...imageAttrs} class="side dark:sl-hidden" />}
+	{rawHtml && <div class="side hero-html sl-flex" set:html={rawHtml} />}
+	<div class="sl-flex stack">
+		<div class="sl-flex copy">
+			<h1 id="_top" data-page-title set:html={title} />
+			{data.draft && <DraftContentNotice />}
+			{tagline && <div class="tagline" set:html={tagline} />}
+		</div>
+		{
+			actions.length > 0 && (
+				<div class="sl-flex actions">
+					{actions.map(({ attrs: { class: className, ...attrs } = {}, icon, link: href, text, variant }) => (
+						<LinkButton {href} {variant} icon={icon?.name} class:list={[className]} {...attrs}>
+							{text}
+							{icon?.html && <Fragment set:html={icon.html} />}
+						</LinkButton>
+					))}
+				</div>
+			)
+		}
+	</div>
+</div>
+
+<style>
+	.hero {
+		position: relative;
+		isolation: isolate;
+		display: grid;
+		grid-template-columns: 100%;
+		align-items: center;
+		gap: 1rem;
+		padding-block: 3rem 2.5rem;
+	}
+
+	/* the picture spans the viewport, from the header down to the end of the hero */
+	.backdrop {
+		position: absolute;
+		z-index: -1;
+		top: -1.5rem;
+		bottom: 0;
+		left: calc(50% - 50vw);
+		width: 100vw;
+		overflow: hidden;
+		border-bottom: 1px solid var(--sl-color-hairline);
+		background:
+			radial-gradient(ellipse at 75% 50%, var(--sl-color-accent-low), transparent 70%),
+			var(--sl-color-bg);
+	}
+
+	.streamlines,
+	.backdrop-image {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		/* faint behind the text on small screens */
+		opacity: 0.35;
+	}
+
+	.streamlines {
+		stroke: var(--sl-color-accent);
+	}
+
+	.cylinder {
+		fill: var(--sl-color-bg);
+		stroke: var(--sl-color-accent);
+		stroke-width: 2.5;
+	}
+
+	.tracer {
+		fill: var(--sl-color-accent-high);
+	}
+
+	.side {
+		object-fit: contain;
+		width: min(70%, 20rem);
+		height: auto;
+		margin-inline: auto;
+	}
+
+	.stack {
+		flex-direction: column;
+		gap: clamp(1.5rem, calc(1.5rem + 1vw), 2rem);
+		text-align: center;
+	}
+
+	.copy {
+		flex-direction: column;
+		gap: 1rem;
+		align-items: center;
+	}
+
+	.copy > * {
+		max-width: 50ch;
+	}
+
+	h1 {
+		font-size: clamp(var(--sl-text-4xl), calc(0.25rem + 6vw), var(--sl-text-6xl));
+		line-height: var(--sl-line-height-headings);
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--sl-color-white);
+	}
+
+	.tagline {
+		font-size: clamp(var(--sl-text-base), calc(0.0625rem + 2vw), var(--sl-text-xl));
+		color: var(--sl-color-gray-2);
+		text-wrap: balance;
+	}
+
+	.actions {
+		gap: 1rem 2rem;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+
+	@media (min-width: 50rem) {
+		.hero {
+			grid-template-columns: 7fr 4fr;
+			gap: 3%;
+			padding-block: clamp(3rem, calc(1rem + 10vmin), 8rem);
+		}
+
+		.side {
+			order: 2;
+			width: min(100%, 25rem);
+		}
+
+		.stack {
+			text-align: start;
+		}
+
+		.copy {
+			align-items: flex-start;
+		}
+
+		.actions {
+			justify-content: flex-start;
+		}
+
+		/* full strength on the right, fading out behind the text on the left */
+		.streamlines,
+		.backdrop-image {
+			opacity: 1;
+			mask-image: linear-gradient(to right, transparent 15%, #000 55%);
+		}
+	}
+</style>
