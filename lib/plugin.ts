@@ -1,6 +1,6 @@
 // The Starlight plugin: the look of the max-models sites (palette, header with a row of section
-// links, KaTeX styles, favicon) and the settings the components read (repository, branch, nav links,
-// versions, projects menu).
+// links, the home page hero on a header picture, KaTeX styles, favicon) and the settings the
+// components read (repository, branch, nav links, versions, projects menu).
 // `defineDocs` adds it for you; use it directly in a site that builds its own Astro config.
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -112,6 +112,7 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 					components: {
 						Header: '@max-models/starlight-theme/components/Header.astro',
 						Banner: '@max-models/starlight-theme/components/Banner.astro',
+						Hero: '@max-models/starlight-theme/components/Hero.astro',
 						...starlight.components,
 					},
 				});
