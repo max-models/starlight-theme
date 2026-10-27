@@ -9,8 +9,8 @@ when it bumps its version.
 |---|---|
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
-| `theme()` Starlight plugin | The palette, a header with a row of section links, a stable/dev switch and a projects menu, the KaTeX styles, the favicon. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `Header`, `Banner`, `Hero`: Starlight's, replaced |
+| `theme()` Starlight plugin | The palette, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the link cards of a home page; `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
@@ -92,12 +92,15 @@ Other options:
 | `projectsUrl` | The JSON list the menu loads, default `https://max-models.github.io/projects.json`; `false` keeps the built-in list |
 | `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
 | `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page |
-| `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
+| `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; without one the title has the max-models wave before it, `false` for neither. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
+| `release` | The badge of the latest release in the hero: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
+| `shareImage` | `false` for no share image (`<base>/og.png`, the header picture with the title and description, for link previews) |
 
 and `starlight` / `astro` for anything else, merged over the result, e.g.
 `astro: { redirects: { '/tutorials/': '/guides/' } }` (site-root paths; `defineDocs` adds the base
 path to the targets, which Astro does not) or `starlight: { plugins: [...] }`.
-A nav link is "current" on every page under its first path segment, or under `section`.
+A nav link is "current" on every page under its first path segment, or under `section`, and its
+`description` shows in the `<StartHere />` grid of the home page.
 
 `docs/src/content.config.ts`:
 
@@ -125,8 +128,47 @@ heroBackground: ../../assets/header.png
 # or none:   heroBackground: false
 ```
 
-On wide screens the picture fades out behind the title on the left. `hero.image` still shows an
+On wide screens the picture fades out behind the title on the left, and a few tracer dots drift along
+the streamlines (they stand still for readers who prefer reduced motion). `hero.image` still shows an
 image beside the title, as in Starlight.
+
+Above the title is the latest release, read at build time (see `release`; the docs workflow passes
+`GITHUB_TOKEN` for the API, a local build reads the redirect of the releases page). `heroInstall` in
+the frontmatter shows a command to copy below the buttons:
+
+```yaml
+heroInstall: pip install git+https://github.com/max-models/simgeometry
+```
+
+`<StartHere />` turns the header links into link cards, with the `description` of each nav link,
+so the two stay in step (and point into `/<repo>/dev/` in the dev build). `exclude` leaves some out,
+and cards in its slot come after them:
+
+```mdx
+import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
+
+## Start here
+
+<StartHere exclude={['Development']}>
+  <LinkCard title="Quickstart" href="/simgeometry/getting-started/quickstart/" />
+</StartHere>
+```
+
+`starlight-theme-init` writes a home page with both, and nav links with descriptions.
+
+### Footer, citation and share image
+
+Below every page, a line names the project family (`https://<owner>.github.io/`) and links the
+sibling sites (from the built-in projects list), the license, the "Cite" page and the source.
+`defineDocs` reads them from the project next to `pyproject`:
+
+- the license from `license` in `CITATION.cff`, `license = "..."` in `pyproject.toml`, or the first
+  line of `LICENSE`/`LICENSE.txt`/`LICENSE.md`, which it also links to;
+- the citation from `CITATION.cff` (its `preferred-citation` if it has one): a `<base>/cite/` page
+  with a one-line citation and BibTeX.
+
+The share image `<base>/og.png` (1200 x 630, with `og:image` and `twitter:card` in every page's
+head) is what GitHub, Slack and Mattermost show for a link to the site.
 
 ### The projects menu
 

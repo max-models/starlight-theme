@@ -30,6 +30,10 @@ describe('heroPattern', () => {
 		expect(pattern.circle.cy).toBeGreaterThan(0);
 		expect(pattern.circle.cy).toBeLessThan(pattern.height);
 		for (const line of pattern.lines) expect(line.d).not.toContain('NaN');
+		for (const dot of pattern.dots) {
+			expect(pattern.lines[dot.line]).toBeDefined();
+			expect(dot.offset).toBeLessThanOrEqual(dot.duration);
+		}
 	});
 
 	it('seeds a generator in [0, 1)', () => {

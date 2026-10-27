@@ -40,10 +40,16 @@ function build(options: Any = {}) {
 }
 
 /** Run the theme plugin's hooks like Starlight and Astro would; return what they set up. */
-function runTheme(plugin: Any, starlight: Any = {}, publicDir = new URL('file:///nonexistent/public/')) {
+function runTheme(
+	plugin: Any,
+	starlight: Any = {},
+	publicDir = new URL('file:///nonexistent/public/'),
+	astroConfig: Any = { site: undefined, base: '/' }
+) {
 	const result: Any = { routes: [], middleware: [] };
 	plugin.hooks['config:setup']({
 		config: starlight,
+		astroConfig,
 		updateConfig: (update: Any) => (result.starlight = update),
 		addRouteMiddleware: (middleware: Any) => result.middleware.push(middleware),
 		addIntegration: (integration: Any) =>
@@ -243,5 +249,32 @@ describe('theme plugin', () => {
 		const publicDir = mkdtempSync(join(tmpdir(), 'public-'));
 		writeFileSync(join(publicDir, 'favicon.svg'), '<svg/>');
 		expect(runTheme(theme({ repository: 'a/b' }), {}, new URL(`file://${publicDir}/`)).routes).toEqual([]);
+	});
+
+	it('serves a share image with its meta tags when the site has a URL', () => {
+		const site = { site: 'https://max-models.github.io', base: '/simgeometry' };
+		const setup = runTheme(theme({ repository: 'max-models/simgeometry' }), { title: 'simgeometry', description: 'Grids.' }, undefined, site);
+		expect(setup.routes.map((route: Any) => route.pattern)).toContain('/og.png');
+		expect(setup.starlight.head[0]).toEqual({
+			tag: 'meta',
+			attrs: { property: 'og:image', content: 'https://max-models.github.io/simgeometry/og.png' },
+		});
+		expect(setup.virtual.site).toEqual({ title: 'simgeometry', description: 'Grids.' });
+		const without = runTheme(theme({ repository: 'a/b', shareImage: false }), {}, undefined, site);
+		expect(without.routes.map((route: Any) => route.pattern)).not.toContain('/og.png');
+		expect(without.starlight.head).toEqual([]);
+	});
+
+	it('adds the Cite page with a citation, the wave logo without a logo of the site, and the release source', () => {
+		const citation = { text: 'Max (2026) x', bibtex: '@software{x}' };
+		const setup = runTheme(theme({ repository: 'a/b', citation }));
+		expect(setup.routes.map((route: Any) => route.pattern)).toContain('/cite');
+		expect(setup.virtual.citation).toEqual(citation);
+		expect(setup.virtual.logo).toBe(true);
+		expect(setup.virtual.release).toEqual({ github: 'a/b', pypi: null });
+		expect(setup.virtual.family).toEqual({ name: 'a projects', href: 'https://a.github.io/' });
+		expect(runTheme(theme({ repository: 'a/b' }), { logo: { src: './logo.svg' } }).virtual.logo).toBe(false);
+		expect(runTheme(theme({ repository: 'a/b', release: { pypi: 'c' } })).virtual.release).toEqual({ github: 'a/b', pypi: 'c' });
+		expect(runTheme(theme({ repository: 'a/b', release: false })).virtual.release).toBeNull();
 	});
 });

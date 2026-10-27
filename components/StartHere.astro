@@ -1,0 +1,23 @@
+---
+// The "Start here" grid of a home page: a link card for each link in the header (the `nav` of
+// defineDocs, with its `description`), so the two stay in step. Cards in the slot come after them.
+//
+//     import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
+//     <StartHere exclude={['Development']} />
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import theme from 'virtual:starlight-theme/config';
+import { withBase } from '../utils/base';
+
+interface Props {
+	/** Labels of nav links to leave out. */
+	exclude?: string[];
+}
+
+const { exclude = [] } = Astro.props;
+const links = theme.nav.filter((link) => !exclude.includes(link.label));
+---
+
+<CardGrid>
+	{links.map((link) => <LinkCard title={link.label} href={withBase(link.link)} description={link.description} />)}
+	<slot />
+</CardGrid>
