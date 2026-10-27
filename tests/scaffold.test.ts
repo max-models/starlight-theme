@@ -100,14 +100,18 @@ describe('scaffold', () => {
 		expect(pkg.dependencies['@max-models/starlight-theme']).toBe(`github:max-models/starlight-theme#v${themePackage.version}`);
 		expect(pkg.scripts.build).toBe('starlight-notebooks convert && starlight-gallery convert && starlight-check-mdx && astro build');
 		expect(files['docs/.gitignore']).toContain('src/content/docs/examples/*.mdx');
-		expect(files['docs/src/content/docs/index.mdx']).toContain('link: /grids/getting-started/installation/');
+		const index = files['docs/src/content/docs/index.mdx'];
+		expect(index).toContain('link: /grids/getting-started/installation/');
+		expect(index).toContain('heroInstall: "pip install git+https://github.com/max-models/grids"');
+		expect(index).toContain('<StartHere />');
+		expect(index).toContain('<Card title="Gallery"');
 		expect(JSON.parse(files['renovate.json']).extends).toContain('github>max-models/starlight-theme:renovate-preset');
 	});
 
 	it('writes an astro.config.mjs with the nav and sidebar of what the project has', () => {
 		const config = astroConfig(full);
 		expect(config).toContain("title: 'Grids\\' site',");
-		expect(config).toContain("{ label: 'API', link: '/api/grids/', section: '/api/' },");
+		expect(config).toContain("{ label: 'API', link: '/api/grids/', section: '/api/', description: 'Generated from the docstrings.' },");
 		expect(config).toContain("{ label: 'Gallery', items: [{ autogenerate: { directory: 'examples' } }] },");
 		expect(config).not.toContain('owner:');
 		const bare = astroConfig({ ...full, owner: 'someone', pythonPackage: undefined, tutorials: false, gallery: false });

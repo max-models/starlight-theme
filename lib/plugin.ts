@@ -1,13 +1,16 @@
 // The Starlight plugin: the look of the max-models sites (palette, header with a row of section
-// links, the home page hero on a header picture, KaTeX styles, favicon) and the settings the
-// components read (repository, branch, nav links, versions, projects menu).
+// links and the wave logo, the home page hero on a header picture with the latest release, a
+// footer naming the project family, a "Cite" page, KaTeX styles, favicon, share image) and the
+// settings the components read (repository, branch, nav links, versions, projects menu).
 // `defineDocs` adds it for you; use it directly in a site that builds its own Astro config.
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { StarlightPlugin } from '@astrojs/starlight/types';
 import type { ViteUserConfig } from 'astro';
+import type { Citation, License } from './citation.ts';
 import { menuEntries, PROJECTS_URL, type MenuEntry, type Project } from './project-menu.ts';
 import { projects as defaultProjects } from './projects.ts';
+import type { ReleaseSource } from './release.ts';
 
 export interface NavLink {
 	label: string;
@@ -15,6 +18,8 @@ export interface NavLink {
 	link: string;
 	/** Path prefix that marks the link as current; defaults to the first segment of `link`. */
 	section?: string;
+	/** One line under the link in the home page's `<StartHere />` grid. */
+	description?: string;
 }
 
 /** The stable and the development docs of one site, served side by side. */
@@ -49,18 +54,39 @@ export interface ThemeOptions {
 	projects?: Project[] | false;
 	/** The JSON list of projects the menu loads (default https://max-models.github.io/projects.json); `false` keeps the built-in one. */
 	projectsUrl?: string | false;
+	/**
+	 * The latest release in the hero: from PyPI with `pypi` (the distribution name; GitHub when that
+	 * fails), else from the GitHub releases of `repository`; `false` for no badge.
+	 */
+	release?: { pypi?: string } | false;
+	/** The wave logo before the site title, when the site sets no Starlight `logo`. Default true. */
+	logo?: boolean;
+	/** How to cite the project: a "Cite" page and a link to it in the footer. */
+	citation?: Citation;
+	/** The project's license, in the footer. */
+	license?: License;
+	/** A share image of the site (`<base>/og.png`, the header picture with the title) for link previews. Default true. */
+	shareImage?: boolean;
 }
 
 /** What `virtual:starlight-theme/config` exports. */
 export interface ThemeConfig {
 	repository: string;
 	branch: string;
-	nav: Required<NavLink>[];
+	nav: (NavLink & { section: string })[];
 	versions: Versions | null;
 	launch: LaunchService[];
 	projects: MenuEntry[];
 	/** Where the header script loads the menu from; null for none. */
 	projectsUrl: string | null;
+	release: ReleaseSource | null;
+	logo: boolean;
+	citation: Citation | null;
+	license: License | null;
+	/** The owner's page of all projects, for the footer, e.g. https://max-models.github.io/. */
+	family: { name: string; href: string };
+	/** Title and description of the site, for the share image (set from the Starlight config). */
+	site: { title: string; description: string };
 }
 
 const VIRTUAL_ID = 'virtual:starlight-theme/config';
@@ -93,6 +119,12 @@ export function themeConfig(options: ThemeOptions): ThemeConfig {
 		launch: options.launch ?? [],
 		projects: options.projects === false ? [] : menuEntries(options.projects ?? defaultProjects, owner, repo),
 		projectsUrl: options.projects === undefined && options.projectsUrl !== false ? (options.projectsUrl ?? PROJECTS_URL) : null,
+		release: options.release === false ? null : { github: options.repository, pypi: options.release?.pypi ?? null },
+		logo: options.logo ?? true,
+		citation: options.citation ?? null,
+		license: options.license ?? null,
+		family: { name: `${owner} projects`, href: `https://${owner}.github.io/` },
+		site: { title: '', description: '' },
 	};
 }
 
@@ -101,8 +133,27 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 	return {
 		name: '@max-models/starlight-theme',
 		hooks: {
-			'config:setup'({ config: starlight, updateConfig, addIntegration, addRouteMiddleware }) {
+			'config:setup'({ config: starlight, astroConfig, updateConfig, addIntegration, addRouteMiddleware }) {
+				const title = typeof starlight.title === 'string' ? starlight.title : (Object.values(starlight.title ?? {})[0] ?? '');
+				config.site = { title, description: starlight.description ?? '' };
+				config.logo &&= starlight.logo === undefined;
+				// link previews: the share image, as an absolute URL (needs Astro's `site`)
+				const shareImage =
+					options.shareImage !== false && astroConfig.site
+						? new URL(`${astroConfig.base.replace(/\/?$/, '/')}og.png`, astroConfig.site).href
+						: undefined;
 				updateConfig({
+					head: [
+						...(shareImage
+							? [
+									{ tag: 'meta' as const, attrs: { property: 'og:image', content: shareImage } },
+									{ tag: 'meta' as const, attrs: { property: 'og:image:width', content: '1200' } },
+									{ tag: 'meta' as const, attrs: { property: 'og:image:height', content: '630' } },
+									{ tag: 'meta' as const, attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+								]
+							: []),
+						...(starlight.head ?? []),
+					],
 					// the theme first, so a site's own customCss wins
 					customCss: [
 						'@max-models/starlight-theme/styles/math.css',
@@ -113,6 +164,8 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 						Header: '@max-models/starlight-theme/components/Header.astro',
 						Banner: '@max-models/starlight-theme/components/Banner.astro',
 						Hero: '@max-models/starlight-theme/components/Hero.astro',
+						SiteTitle: '@max-models/starlight-theme/components/SiteTitle.astro',
+						Footer: '@max-models/starlight-theme/components/Footer.astro',
 						...starlight.components,
 					},
 				});
@@ -125,6 +178,12 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 					hooks: {
 						'astro:config:setup'({ config: astro, injectRoute, updateConfig: updateAstroConfig }) {
 							updateAstroConfig({ vite: { plugins: [viteConfigModule(config)] } });
+							if (shareImage) {
+								injectRoute({ pattern: '/og.png', entrypoint: '@max-models/starlight-theme/routes/og.png.ts', prerender: true });
+							}
+							if (config.citation) {
+								injectRoute({ pattern: '/cite', entrypoint: '@max-models/starlight-theme/routes/cite.astro', prerender: true });
+							}
 							// the max-models favicon, unless the site has its own
 							const own = new URL('favicon.svg', astro.publicDir);
 							if (starlight.favicon === undefined && !existsSync(fileURLToPath(own))) {

@@ -1,0 +1,21 @@
+---
+// `<base>/cite/`: how to cite the project, from its CITATION.cff. The theme plugin adds the page when
+// defineDocs finds that file (or the `citation` option of the plugin is set).
+import { Code } from '@astrojs/starlight/components';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import theme from 'virtual:starlight-theme/config';
+
+const citation = theme.citation!;
+const cff = `https://github.com/${theme.repository}/blob/${theme.branch}/CITATION.cff`;
+---
+
+<StarlightPage
+	frontmatter={{ title: 'Cite', description: `How to cite ${theme.site.title}.` }}
+	headings={[{ depth: 2, slug: 'bibtex', text: 'BibTeX' }]}
+>
+	<p>If you use {theme.site.title} in your work, please cite it as</p>
+	<blockquote>{citation.text}</blockquote>
+	<h2 id="bibtex">BibTeX</h2>
+	<Code code={citation.bibtex} lang="bibtex" />
+	<p>From the <a href={cff}>CITATION.cff</a> of the repository, which GitHub also offers under "Cite this repository".</p>
+</StarlightPage>

@@ -9,8 +9,11 @@ export interface HeroPattern {
 	circle: { cx: number; cy: number; r: number };
 	/** One path per streamline, with its opacity (fainter away from the cylinder). */
 	lines: { d: string; opacity: number }[];
-	/** Small dots on the streamlines, like tracer particles. */
-	dots: { cx: number; cy: number }[];
+	/**
+	 * Small dots drifting along the streamlines, like tracer particles: the index of their line, the
+	 * seconds one pass takes and how far into it (in seconds) they start.
+	 */
+	dots: { line: number; duration: number; offset: number }[];
 }
 
 /** A deterministic random generator in [0, 1) from a string (FNV-1a hash, then mulberry32). */
@@ -59,8 +62,8 @@ export function heroPattern(seed: string, width = 1200, height = 480): HeroPatte
 			}
 			lines.push({ d: `M${points.join('L')}`, opacity: round(Math.max(0.15, 1 - c / (height * 0.6))) });
 			if (random() < 0.35) {
-				const x = cx + (random() - 0.6) * width * 0.5;
-				dots.push({ cx: round(x), cy: round(cy - side * streamlineY(x - cx, c, r)) });
+				const duration = round(30 + 30 * random());
+				dots.push({ line: lines.length - 1, duration, offset: round(duration * random()) });
 			}
 		}
 	}

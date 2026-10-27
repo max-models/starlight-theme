@@ -2,17 +2,24 @@
 // Starlight's hero (the `hero` frontmatter of a home page) on a header picture across the whole
 // width: by default streamlines of the flow past a cylinder in the accent colour, a different one per
 // site (seeded by the site title); `heroBackground` in the frontmatter sets an image of the site's
-// own instead, or `false` for none. The theme plugin replaces Hero with this one.
+// own instead, or `false` for none. Tracer dots drift along the streamlines (still for readers who
+// prefer reduced motion). Above the title, the latest release (lib/release.ts); below the buttons,
+// `heroInstall` from the frontmatter as a command to copy. The theme plugin replaces Hero with this one.
 import { Image } from 'astro:assets';
 import config from 'virtual:starlight/user-config';
 import DraftContentNotice from 'virtual:starlight/components/DraftContentNotice';
 import { LinkButton } from '@astrojs/starlight/components';
+import theme from 'virtual:starlight-theme/config';
 import { heroPattern } from '../lib/hero-pattern.ts';
+import { latestRelease } from '../lib/release.ts';
 
 const { data } = Astro.locals.starlightRoute.entry;
 const { title = data.title, tagline, image, actions = [] } = data.hero || {};
-const background = (data as { heroBackground?: ImageMetadata | { dark: ImageMetadata; light: ImageMetadata } | false })
-	.heroBackground;
+const { heroBackground: background, heroInstall: install } = data as {
+	heroBackground?: ImageMetadata | { dark: ImageMetadata; light: ImageMetadata } | false;
+	heroInstall?: string;
+};
+const release = await latestRelease(theme.release);
 
 const imageAttrs = {
 	loading: 'eager' as const,
@@ -54,7 +61,14 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 						</g>
 						<circle class="cylinder" cx={pattern.circle.cx} cy={pattern.circle.cy} r={pattern.circle.r} />
 						{pattern.dots.map((dot) => (
-							<circle class="tracer" cx={dot.cx} cy={dot.cy} r="4" />
+							<circle class="tracer" r="4">
+								<animateMotion
+									dur={`${dot.duration}s`}
+									begin={`-${dot.offset}s`}
+									repeatCount="indefinite"
+									path={pattern.lines[dot.line].d}
+								/>
+							</circle>
 						))}
 					</svg>
 				)}
@@ -79,6 +93,13 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	{rawHtml && <div class="side hero-html sl-flex" set:html={rawHtml} />}
 	<div class="sl-flex stack">
 		<div class="sl-flex copy">
+			{
+				release && (
+					<a class="release" href={release.href}>
+						<span>Latest release</span> v{release.version}
+					</a>
+				)
+			}
 			<h1 id="_top" data-page-title set:html={title} />
 			{data.draft && <DraftContentNotice />}
 			{tagline && <div class="tagline" set:html={tagline} />}
@@ -95,8 +116,37 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 				</div>
 			)
 		}
+		{
+			install && (
+				<div class="install sl-flex">
+					<code>
+						<span class="prompt" aria-hidden="true">$</span> {install}
+					</code>
+					<button type="button" data-copy={install} aria-label="Copy the command">
+						Copy
+					</button>
+				</div>
+			)
+		}
 	</div>
 </div>
+
+<script>
+	// the dots stand still for readers who prefer reduced motion, spread along their lines
+	const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+	const svg = document.querySelector<SVGSVGElement>('.hero .streamlines');
+	const apply = () => (reduce.matches ? svg?.pauseAnimations() : svg?.unpauseAnimations());
+	apply();
+	reduce.addEventListener('change', apply);
+
+	for (const button of document.querySelectorAll<HTMLButtonElement>('.hero [data-copy]')) {
+		button.addEventListener('click', async () => {
+			await navigator.clipboard.writeText(button.dataset.copy ?? '');
+			button.textContent = 'Copied';
+			setTimeout(() => (button.textContent = 'Copy'), 1500);
+		});
+	}
+</script>
 
 <style>
 	.hero {
@@ -192,6 +242,60 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 		justify-content: center;
 	}
 
+	.release {
+		padding: 0.15rem 0.75rem;
+		border: 1px solid var(--sl-color-accent);
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--sl-color-bg) 70%, transparent);
+		font-size: var(--sl-text-sm);
+		font-weight: 600;
+		color: var(--sl-color-text-accent);
+		text-decoration: none;
+	}
+	.release span {
+		font-weight: 400;
+		color: var(--sl-color-gray-2);
+	}
+	.release:hover {
+		background: var(--sl-color-accent-low);
+	}
+
+	.install {
+		align-self: center;
+		align-items: center;
+		gap: 0.75rem;
+		max-width: 100%;
+		padding: 0.5rem 0.5rem 0.5rem 1rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.25rem;
+		background: color-mix(in srgb, var(--sl-color-bg-inline-code) 85%, transparent);
+	}
+	.install code {
+		overflow-x: auto;
+		white-space: nowrap;
+		font-size: var(--sl-text-sm);
+		background: none;
+		padding: 0;
+	}
+	.install .prompt {
+		color: var(--sl-color-gray-3);
+		user-select: none;
+	}
+	.install button {
+		flex-shrink: 0;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.25rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-xs);
+		cursor: pointer;
+	}
+	.install button:hover {
+		color: var(--sl-color-accent);
+		border-color: var(--sl-color-accent);
+	}
+
 	@media (min-width: 50rem) {
 		.hero {
 			grid-template-columns: 7fr 4fr;
@@ -214,6 +318,10 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 
 		.actions {
 			justify-content: flex-start;
+		}
+
+		.install {
+			align-self: flex-start;
 		}
 
 		/* full strength on the right, fading out behind the text on the left */

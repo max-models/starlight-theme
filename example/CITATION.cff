@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+type: software
+title: starlight-theme
+authors:
+  - family-names: Lindqvist
+    given-names: Max
+version: 0.5.0
+date-released: "2026-10-27"
+repository-code: https://github.com/max-models/starlight-theme
+url: https://max-models.github.io/starlight-theme/
+license: MIT

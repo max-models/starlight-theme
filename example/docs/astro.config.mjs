@@ -9,12 +9,13 @@ export default defineDocs({
 	title: 'starlight-theme',
 	description: 'The shared docs setup of the max-models projects, shown on a small example package.',
 	pythonPackage: 'example_pkg',
+	// the descriptions show in the <StartHere /> grid of the home page
 	nav: [
-		{ label: 'Getting started', link: '/getting-started/installation/' },
-		{ label: 'Tutorials', link: '/tutorials/' },
-		{ label: 'Gallery', link: '/examples/' },
-		{ label: 'Development', link: '/development/docs/' },
-		{ label: 'API', link: '/api/example_pkg/', section: '/api/' },
+		{ label: 'Getting started', link: '/getting-started/installation/', description: 'Use the theme in a project.' },
+		{ label: 'Tutorials', link: '/tutorials/', description: 'A converted notebook.' },
+		{ label: 'Gallery', link: '/examples/', description: 'Figures from example scripts.' },
+		{ label: 'Development', link: '/development/docs/', description: 'Build the docs and write examples.' },
+		{ label: 'API', link: '/api/example_pkg/', section: '/api/', description: 'Generated from the docstrings.' },
 	],
 	sidebar: [
 		{

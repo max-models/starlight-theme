@@ -1,0 +1,66 @@
+---
+// Starlight's footer (edit link, last updated, previous/next), then a line naming the project family
+// with links to the sibling sites, the license and the "Cite" page. The theme plugin replaces Footer
+// with this one.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import theme from 'virtual:starlight-theme/config';
+import { withBase } from '../utils/base';
+
+const siblings = theme.projects.filter((project) => !project.current);
+const github = `https://github.com/${theme.repository}`;
+---
+
+<Default />
+<div class="family" data-pagefind-ignore>
+	<p class="about">
+		<a href={theme.family.href}>Part of the {theme.family.name}</a>
+		{theme.license && (theme.license.href ? <a href={theme.license.href}>{theme.license.name} license</a> : <span>{theme.license.name} license</span>)}
+		{theme.citation && <a href={withBase('/cite/')}>Cite</a>}
+		<a href={github}>Source on GitHub</a>
+	</p>
+	{
+		siblings.length > 0 && (
+			<nav class="siblings" aria-label="Other projects">
+				{siblings.map((project) => (
+					<a href={project.href} title={project.description || undefined}>
+						{project.title}
+					</a>
+				))}
+			</nav>
+		)
+	}
+</div>
+
+<style>
+	.family {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 3rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--sl-color-hairline);
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-3);
+	}
+	.about,
+	.siblings {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1.25rem;
+		margin: 0;
+	}
+	.siblings {
+		gap: 0.25rem 1rem;
+	}
+	a {
+		color: var(--sl-color-gray-2);
+		text-decoration: none;
+	}
+	a:hover {
+		color: var(--sl-color-accent);
+	}
+	.about a:first-child {
+		font-weight: 600;
+		color: var(--sl-color-text);
+	}
+</style>
