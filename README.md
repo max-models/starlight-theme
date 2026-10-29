@@ -118,9 +118,23 @@ A site's own `customCss` still works and loads after the theme's.
 ### The home page
 
 A page with a `hero` in its frontmatter (the home page, `template: splash`) shows it on a header
-picture across the whole width: streamlines of the flow past a cylinder in the accent colour, placed
-differently on each site (seeded by the site title). `heroBackground` in the frontmatter replaces it
-with an image of the site's own, or removes it:
+picture across the whole width: the site's own figure from `docs/src/assets/hero.svg` when there is
+one, otherwise streamlines of the flow past a cylinder in the accent colour, placed differently on
+each site (seeded by the site title).
+
+The site's figure is an animated SVG written with plasma-plots, usually by a `docs/hero.py` that runs
+the package on a small case; its marks take the site's colours in light and dark mode:
+
+```python
+from plasma_plots.hero import HeroFigure
+
+fig = HeroFigure(xlim=(0, 4), ylim=(-1, 1))
+line = fig.line(x, y, tone="accent", opacity=0.6, title="shown on hover")
+fig.tracer(line, duration=6)  # a dot drifting along the line
+fig.save("docs/src/assets/hero.svg")
+```
+
+`heroBackground` in the frontmatter replaces either with an image, or removes it:
 
 ```yaml
 heroBackground: ../../assets/header.png
