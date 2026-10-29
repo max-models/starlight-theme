@@ -97,7 +97,7 @@ describe('scaffold', () => {
 			'renovate.json',
 		]);
 		const pkg = JSON.parse(files['docs/package.json']);
-		expect(pkg.dependencies['@max-models/starlight-theme']).toBe(`github:max-models/starlight-theme#v${themePackage.version}`);
+		expect(pkg.dependencies['@max-models/starlight-theme']).toBe(`github:max-models/starlight-theme#v${themePackage.version.split('.')[0]}`);
 		expect(pkg.scripts.build).toBe('starlight-notebooks convert && starlight-gallery convert && starlight-check-mdx && astro build');
 		expect(files['docs/.gitignore']).toContain('src/content/docs/examples/*.mdx');
 		const index = files['docs/src/content/docs/index.mdx'];
@@ -119,9 +119,9 @@ describe('scaffold', () => {
 		expect(bare).not.toMatch(/Tutorials|Gallery|API|pythonPackage/);
 	});
 
-	it('writes a workflow that calls the reusable one of this version', () => {
+	it('writes a workflow that calls the reusable one of this major tag', () => {
 		const parsed = parse(workflow(full, versions));
-		expect(parsed.jobs.docs.uses).toBe(`max-models/starlight-theme/.github/workflows/docs.yml@v${themePackage.version}`);
+		expect(parsed.jobs.docs.uses).toBe(`max-models/starlight-theme/.github/workflows/docs.yml@v${themePackage.version.split('.')[0]}`);
 		expect(parsed.jobs.docs.with).toEqual({
 			gallery: true,
 			'smoke-paths': 'tutorials/index.html\nexamples/index.html\napi/grids/index.html\n',

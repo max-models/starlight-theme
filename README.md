@@ -25,7 +25,7 @@ its pages import always come in matching versions.
 In the root of a project, without installing anything first:
 
 ```sh
-npx --package github:max-models/starlight-theme#v0.5.0 starlight-theme-init
+npx --package github:max-models/starlight-theme#v0 starlight-theme-init
 cd docs && npm install
 ```
 
@@ -40,7 +40,7 @@ and swaps their dependencies in the existing `docs/package.json` for the theme.
 By hand, in `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.5.0
+npm install github:max-models/starlight-theme#v0
 ```
 
 `docs/package.json` then needs only:
@@ -49,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.5.0
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.5.0",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -351,7 +351,7 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0
     with:
       smoke-paths: |
         tutorials/index.html
@@ -380,7 +380,8 @@ in `[tool.uv.sources]`.
 ### Renovate
 
 The `renovate.json` that `starlight-theme-init` writes extends the theme's preset, which bumps the
-theme in `docs/package.json` and the tag of the docs workflow in one pull request:
+theme in `docs/package.json` and the tag of the docs workflow in one pull request. On the major tag
+(`#v0`, `@v0`) that is only needed for a new major:
 
 ```json
 {
@@ -419,10 +420,14 @@ Work happens on `devel`; `main` holds the releases.
 | `test_pytest.yml` | push / pull request to `main` or `devel` | tests of the notebook and gallery tools |
 | `test_vitest.yml` | push / pull request to `main` or `devel` | tests of `defineDocs`, the plugin and `starlight-theme-init` |
 | `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `main` and to <https://max-models.github.io/starlight-theme/dev/> from `devel` |
-| `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already |
+| `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already; moves the major tag (`v0`) and reruns the docs of the sites on it |
 | `docs.yml` | called by the projects | the reusable docs build |
 
-To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. Projects then
-update with `npm install github:max-models/starlight-theme#vX.Y.Z` in `docs/` and the same tag in
-their docs workflow; the Renovate preset opens those bumps. A new project with a docs site goes
+To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. The release
+workflow tags `vX.Y.Z`, moves the major tag (`v0`) to it and reruns the docs of every site whose
+workflow uses `docs.yml@v0` (with a `DOCS_DISPATCH_TOKEN` secret: a token with actions write and
+contents read on the sites; without it they pick the release up on their next push). Projects
+need no bump: the reusable workflow installs the theme of its own major tag over the lockfile's
+(`theme-ref`, `v0` by default; an exact tag pins a site, `""` uses the lockfile). Only a new major
+(`v1`) is a bump in each project. A new project with a docs site goes
 into `lib/projects.ts`, for the projects menu and the cross-references.

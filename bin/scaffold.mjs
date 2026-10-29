@@ -91,9 +91,11 @@ const js = (text) => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
 /** The theme dependency and the versions of its peers, from the theme's own package.json. */
 export function themeVersions(themePackage) {
+	// the major tag (v0 for 0.x), which every release of that major moves forward
+	const major = `v${themePackage.version.split('.')[0]}`;
 	return {
-		theme: `github:max-models/starlight-theme#v${themePackage.version}`,
-		tag: `v${themePackage.version}`,
+		theme: `github:max-models/starlight-theme#${major}`,
+		tag: major,
 		starlight: themePackage.devDependencies['@astrojs/starlight'],
 		astro: themePackage.devDependencies.astro,
 		sharp: '^0.35.3',
