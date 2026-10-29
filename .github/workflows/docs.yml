@@ -2,7 +2,8 @@ name: Docs
 
 # The reusable build of a max-models docs site (docs/, Astro + Starlight with this theme):
 # install the project, execute and convert the notebooks, build, smoke test, and deploy to
-# GitHub Pages. A project calls it from its own .github/workflows/docs.yml:
+# GitHub Pages. The notebooks run in parallel, one job each (parallel-notebooks); their executed
+# copies are cached between runs and passed to the build as artifacts. A project calls it from its own .github/workflows/docs.yml:
 #
 #   on:
 #     push: { branches: ["main", "devel"] }
@@ -12,7 +13,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.6.0
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -64,6 +65,10 @@ on:
         description: Execute and convert the notebooks (failing on errors).
         type: boolean
         default: true
+      parallel-notebooks:
+        description: Run each notebook in its own job; false runs them one after another in the build.
+        type: boolean
+        default: true
       gallery:
         description: Run the example scripts and convert them into the gallery (failing on errors).
         type: boolean
@@ -99,6 +104,8 @@ jobs:
     outputs:
       builds: ${{ steps.plan.outputs.builds }}
       deploy: ${{ steps.plan.outputs.deploy }}
+      notebooks: ${{ steps.notebooks.outputs.matrix }}
+      serial: ${{ steps.notebooks.outputs.serial || '[]' }}
     steps:
       - id: plan
         env:
@@ -125,8 +132,129 @@ jobs:
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
           echo "deploy: $deploy, builds: $builds"
 
-  build:
+      # One job per (build, notebook), listed at the ref of each build with the theme that ref
+      # installs. The listing needs only the theme's tools/notebooks.py and the standard library
+      # (python3 of the runner). A ref whose theme cannot list them (older than 0.6.0, e.g. main
+      # before its first release with it) runs its notebooks in its build, one after another.
+      - uses: actions/checkout@v7
+        if: inputs.notebooks && inputs.parallel-notebooks
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        if: inputs.notebooks && inputs.parallel-notebooks
+        with:
+          node-version: ${{ inputs.node-version }}
+          check-latest: true
+          cache: npm
+          cache-dependency-path: ${{ inputs.npm-lockfile }}
+
+      - id: notebooks
+        if: inputs.notebooks && inputs.parallel-notebooks
+        env:
+          BUILDS: ${{ steps.plan.outputs.builds }}
+          PROJECT: ${{ inputs.project-dir }}
+        run: |
+          matrix='[]'
+          serial='[]'
+          for build in $(jq -c '.[]' <<< "$BUILDS"); do
+            name=$(jq -r .name <<< "$build")
+            ref=$(jq -r .ref <<< "$build")
+            if [ -n "$ref" ]; then git checkout -q "origin/$ref"; else git checkout -q "$GITHUB_SHA"; fi
+            (cd "$PROJECT/docs" && npm ci --ignore-scripts --no-audit --no-fund > /dev/null)
+            if slugs=$(cd "$PROJECT/docs" && DOCS_PYTHON=python3 npx starlight-notebooks list); then
+              matrix=$(jq -c --argjson slugs "$slugs" --argjson build "$build" \
+                '. + [$slugs[] | {build: $build.name, ref: $build.ref, slug: .}]' <<< "$matrix")
+            else
+              echo "$name: the theme cannot list the notebooks; running them in the build"
+              serial=$(jq -c --arg name "$name" '. + [$name]' <<< "$serial")
+            fi
+          done
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "serial=$serial" >> "$GITHUB_OUTPUT"
+          echo "notebooks: $matrix, serial builds: $serial"
+
+  notebook:
     needs: plan
+    if: needs.plan.outputs.notebooks != '' && needs.plan.outputs.notebooks != '[]'
+    name: notebook (${{ matrix.build }}, ${{ matrix.slug }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.notebooks) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.project-dir }}
+    env:
+      DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
+      UV_NO_SOURCES: ${{ (matrix.ref || github.base_ref || github.ref_name) == (inputs.stable-branch || 'main') }}
+      CACHE_DIR: ${{ inputs.project-dir }}/docs/.cache/notebooks
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ inputs.python-version }}
+          enable-cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          check-latest: true
+          cache: npm
+          cache-dependency-path: ${{ inputs.npm-lockfile }}
+
+      - name: Install system packages
+        if: inputs.apt-packages != '' || inputs.xvfb
+        run: sudo apt-get update && sudo apt-get install -y ${{ inputs.apt-packages }} ${{ inputs.xvfb && 'xvfb libgl1 libglx-mesa0' || '' }}
+
+      - name: Let git read private repositories
+        env:
+          GIT_TOKEN: ${{ secrets['git-token'] }}
+        run: |
+          if [ -n "$GIT_TOKEN" ]; then
+            git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Install the project
+        run: |
+          uv sync $(printf -- '--extra %s ' ${{ inputs.extras }})
+          uv run python -m ipykernel install --user --name python3
+
+      - name: Install the npm packages
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: npm ci
+
+      # The executed copy of an earlier run, reused when nothing it may depend on changed: the
+      # notebooks, the Python sources and the locked dependencies. The tool still reruns the
+      # notebook if its cells changed or the last run failed.
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CACHE_DIR }}/${{ matrix.slug }}.*
+          key: notebook-${{ matrix.build }}-${{ matrix.slug }}-${{ hashFiles(format('{0}/**/*.ipynb', inputs.project-dir), format('{0}/**/*.py', inputs.project-dir), format('{0}/pyproject.toml', inputs.project-dir), format('{0}/uv.lock', inputs.project-dir)) }}
+
+      - name: Execute the notebook
+        working-directory: ${{ inputs.project-dir }}/docs
+        env:
+          RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
+        run: $RUN npx starlight-notebooks execute --only ${{ matrix.slug }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: notebook-${{ matrix.build }}-${{ matrix.slug }}
+          path: ${{ env.CACHE_DIR }}/${{ matrix.slug }}.*
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    needs: [plan, notebook]
+    # the notebook jobs are skipped without notebooks; any of them failing fails the docs
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.notebook.result != 'failure' }}
     name: build (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
@@ -140,6 +268,8 @@ jobs:
     env:
       DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
       DOCS_CHANNEL: ${{ matrix.channel }}
+      # the notebooks of this build ran in the notebook jobs
+      PARALLEL: ${{ inputs.parallel-notebooks && !contains(fromJSON(needs.plan.outputs.serial), matrix.name) }}
       DOCS_STABLE_BRANCH: ${{ inputs.stable-branch }}
       # The release branch (stable-branch, else main) builds against PyPI only; anything else uses
       # the [tool.uv.sources] devel branches. The caller's env does not reach a reusable workflow.
@@ -183,13 +313,21 @@ jobs:
         working-directory: ${{ inputs.project-dir }}/docs
         run: npm ci
 
+      - uses: actions/download-artifact@v8
+        if: inputs.notebooks && env.PARALLEL == 'true' && needs.notebook.result == 'success'
+        with:
+          pattern: notebook-${{ matrix.name }}-*
+          merge-multiple: true
+          path: ${{ inputs.project-dir }}/docs/.cache/notebooks
+
       - name: Execute and convert the notebooks
         if: inputs.notebooks
         working-directory: ${{ inputs.project-dir }}/docs
         env:
           RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
         run: |
-          $RUN npx starlight-notebooks execute
+          # in parallel the notebook jobs ran them; convert --strict fails on any missing run
+          if [ "$PARALLEL" != true ]; then $RUN npx starlight-notebooks execute; fi
           npx starlight-notebooks convert --strict
 
       - name: Run and convert the gallery examples

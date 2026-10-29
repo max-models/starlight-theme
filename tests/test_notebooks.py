@@ -293,6 +293,31 @@ def test_pyvista_scene_without_picture(project, monkeypatch):
     assert (project / "docs" / "public" / "guides" / "bare" / "1.html").exists()
 
 
+def test_list(project, monkeypatch, capsys):
+    v4 = nbformat.v4
+    for name in ("index", "b_second", "a_first"):
+        write_notebook(project / "guides" / f"{name}.ipynb", [v4.new_code_cell("1")])
+    run(project, "list", monkeypatch=monkeypatch)
+    assert json.loads(capsys.readouterr().out) == ["index", "a-first", "b-second"]
+
+
+def test_execute_only(project, monkeypatch):
+    v4 = nbformat.v4
+    for name in ("one", "two"):
+        write_notebook(project / "guides" / f"{name}.ipynb", [v4.new_code_cell("1")])
+    executed = []
+
+    def fake_execute(path, target, timeout, nranks):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        executed.append(path.stem)
+
+    monkeypatch.setattr(notebooks, "execute_notebook", fake_execute)
+    run(project, "execute", "--only", "two", monkeypatch=monkeypatch)
+    assert executed == ["two"]
+    with pytest.raises(SystemExit, match="no notebooks three"):
+        run(project, "execute", "--only", "three", monkeypatch=monkeypatch)
+
+
 def test_changed_notebook_is_not_run(project, monkeypatch):
     v4 = nbformat.v4
     source = project / "guides" / "index.ipynb"
