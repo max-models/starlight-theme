@@ -26,6 +26,8 @@ jobs:
     uses: ./.github/workflows/docs.yml
     with:
       project-dir: example
+      # the theme of this checkout, not a release
+      theme-ref: ""
       npm-lockfile: package-lock.json
       gallery: true
       stable-branch: main

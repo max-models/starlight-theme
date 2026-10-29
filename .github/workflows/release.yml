@@ -1,8 +1,10 @@
 name: Release
 
 # On a push to main: tag v<version> (the version in package.json) and create a GitHub release,
-# unless that release exists already. Projects install the theme from the tag,
-# `npm install github:max-models/starlight-theme#v<version>`; there is no npm publish.
+# unless that release exists already, and move the major tag (v0 for 0.x) to it. Projects build
+# with the major tag (`docs.yml@v0`, which installs the theme `#v0`), so a release reaches every
+# site without a bump in each repo; this workflow then reruns their docs workflows. There is no
+# npm publish.
 
 on:
   push:
@@ -51,3 +53,38 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
+
+      - name: Move the major tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          MAJOR="v${VERSION%%.*}"
+          git tag -f "$MAJOR" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$MAJOR"
+
+  rebuild-sites:
+    # every site that builds with the major tag (docs.yml@v0 in its docs workflow), from devel,
+    # which deploys both the release and devel
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rerun the docs of every site on the major tag
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DISPATCH_TOKEN }}
+          OWNERS: max-models spokes3d
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No DOCS_DISPATCH_TOKEN secret (actions: write, contents: read on the sites); they rebuild on their next push."
+            exit 0
+          fi
+          MAJOR="v$(gh api "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$GITHUB_SHA" --jq .content | base64 -d | jq -r '.version | split(".")[0]')"
+          for owner in $OWNERS; do
+            for repo in $(gh repo list "$owner" --no-archived --limit 200 --json name --jq '.[].name'); do
+              [ "$owner/$repo" = "$GITHUB_REPOSITORY" ] && continue
+              workflow=$(gh api "repos/$owner/$repo/contents/.github/workflows/docs.yml?ref=devel" --jq .content 2>/dev/null | base64 -d 2>/dev/null) || continue
+              grep -q "starlight-theme/.github/workflows/docs.yml@$MAJOR\b" <<< "$workflow" || continue
+              gh workflow run docs.yml -R "$owner/$repo" --ref devel \
+                && echo "rebuilding $owner/$repo" \
+                || echo "::warning::could not rerun the docs of $owner/$repo"
+            done
+          done
