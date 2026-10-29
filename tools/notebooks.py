@@ -10,6 +10,9 @@
     The pages and assets of deleted notebooks are removed.
     Notebooks that have not been executed, or changed since, are converted without outputs
     (``--strict`` fails on them, and on notebooks whose run raised).
+``list``
+    Prints the slugs of the notebooks as a JSON array, e.g. for a CI matrix that runs
+    ``execute --only <slug>`` per notebook in parallel and ``convert`` on the merged caches.
 ``clean``
     Removes the cache, the generated pages and the public assets.
 
@@ -250,7 +253,13 @@ def cmd_execute(settings: Settings, args: argparse.Namespace) -> None:
         else:
             print("[notebooks] mpi4py or mpiexec/mpirun not found; running on 1 rank")
     failed = []
-    for path in notebooks(settings):
+    paths = notebooks(settings)
+    if args.only:
+        unknown = set(args.only) - {slug_of(path) for path in paths}
+        if unknown:
+            sys.exit(f"[notebooks] no notebooks {', '.join(sorted(unknown))}")
+        paths = [path for path in paths if slug_of(path) in args.only]
+    for path in paths:
         slug = slug_of(path)
         target = settings.cache / f"{slug}.ipynb"
         key_file = settings.cache / f"{slug}.key"
@@ -737,6 +746,10 @@ def cmd_convert(settings: Settings, args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_list(settings: Settings, args: argparse.Namespace) -> None:
+    print(json.dumps([slug_of(path) for path in notebooks(settings)]))
+
+
 def cmd_clean(settings: Settings, args: argparse.Namespace) -> None:
     shutil.rmtree(settings.cache, ignore_errors=True)
     shutil.rmtree(settings.public, ignore_errors=True)
@@ -759,6 +772,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     execute.add_argument("--force", action="store_true", help="rerun every notebook")
     execute.add_argument("--timeout", type=int, default=600, help="seconds per cell")
+    execute.add_argument(
+        "--only",
+        action="append",
+        metavar="SLUG",
+        help="run only this notebook (repeatable)",
+    )
     execute.set_defaults(func=cmd_execute)
     convert = sub.add_parser(
         "convert", parents=[common], help="write the MDX pages and assets"
@@ -767,6 +786,10 @@ def main(argv: list[str] | None = None) -> None:
         "--strict", action="store_true", help="fail on missing or failed runs"
     )
     convert.set_defaults(func=cmd_convert)
+    listing = sub.add_parser(
+        "list", parents=[common], help="print the notebook slugs as a JSON array"
+    )
+    listing.set_defaults(func=cmd_list)
     clean = sub.add_parser(
         "clean", parents=[common], help="remove the cache and generated files"
     )
