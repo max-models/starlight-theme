@@ -13,7 +13,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.6.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.6.1
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -28,9 +28,12 @@ name: Docs
 # The release branch (stable-branch, or main) and pull requests into it install the project with
 # UV_NO_SOURCES, i.e. from PyPI only; every other build uses the project's [tool.uv.sources].
 #
-# Without stable-branch, a push to deploy-branch deploys that branch at <owner>.github.io/<repo>/.
-# With it, a push to either branch builds both and deploys stable-branch there and deploy-branch at
-# <repo>/dev/, with a stable/dev switch in the header (DOCS_CHANNEL, read by defineDocs).
+# Without stable-branch, a push to deploy-branch deploys that branch at <owner>.github.io/<repo>/
+# (at the root for the <owner>.github.io repository itself). With stable-branch, a push to either
+# branch builds both and deploys stable-branch there and deploy-branch at <repo>/dev/, with a stable/dev switch in the header (DOCS_CHANNEL, read by defineDocs).
+#
+# A site without pyproject.toml (e.g. the docs of shell tools) skips the Python install; it sets
+# notebooks: false.
 
 on:
   workflow_call:
@@ -283,6 +286,8 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           enable-cache: true
+          # a site without a Python project leaves the uv cache empty
+          ignore-nothing-to-cache: true
 
       - uses: actions/setup-node@v7
         with:
@@ -304,7 +309,9 @@ jobs:
             git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
+      # a site without a Python project (no pyproject.toml), e.g. docs of shell tools
       - name: Install the project
+        if: hashFiles(format('{0}/pyproject.toml', inputs.project-dir)) != ''
         run: |
           uv sync $(printf -- '--extra %s ' ${{ inputs.extras }})
           uv run python -m ipykernel install --user --name python3
@@ -356,7 +363,8 @@ jobs:
         working-directory: ${{ inputs.project-dir }}/docs
         env:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
-          BASE: /${{ github.event.repository.name }}/${{ matrix.path }}
+          # a user or organisation site (<owner>.github.io) is served at the root
+          BASE: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && '/' || format('/{0}/', github.event.repository.name) }}${{ matrix.path }}
         run: |
           missing=0
           for path in index.html $SMOKE_PATHS; do
