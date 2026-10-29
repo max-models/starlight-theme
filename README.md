@@ -69,13 +69,13 @@ export default defineDocs({
 	pythonPackage: 'simgeometry', // adds an "API reference" sidebar group
 	nav: [
 		{ label: 'Getting started', link: '/getting-started/installation/' },
-		{ label: 'Tutorials', link: '/tutorials/' },
+		{ label: 'Examples', link: '/examples/' },
 		{ label: 'Development', link: '/development/docs/' },
 		{ label: 'API', link: '/api/simgeometry/', section: '/api/' },
 	],
 	sidebar: [
 		{ label: 'Getting started', items: [{ label: 'Installation', slug: 'getting-started/installation' }] },
-		{ label: 'Tutorials', items: [{ autogenerate: { directory: 'tutorials' } }] },
+		{ label: 'Examples', items: [{ autogenerate: { directory: 'examples' } }] },
 	],
 });
 ```
@@ -212,6 +212,9 @@ the nearest `.venv`, else `python3`), which needs `nbclient`, `nbformat` and `ip
 "starlight-notebooks": { "source": "../guides", "mpiRanks": 4 }
 ```
 
+The max-models projects keep the notebooks in `tutorials/` and publish them in one Examples
+section with `"section": "examples"`; the scaffold sets this up.
+
 `source` is the notebook directory, which may have subdirectories (the pages are named after
 the notebooks alone, so the directories only organise the sources), `section` the URL section
 (default: the directory name),
@@ -310,11 +313,13 @@ pages are named after the scripts alone); `README.md` in the directory is the in
 gallery page. Settings, in `docs/package.json`:
 
 ```json
-"starlight-gallery": { "source": "../examples", "section": "examples", "title": "Gallery" }
+"starlight-gallery": { "source": "../examples", "section": "example-scripts", "title": "Scripts" }
 ```
 
-Add `starlight-gallery convert` after `starlight-notebooks convert` in the `dev` and `build` scripts, a
-`{ autogenerate: { directory: 'examples' } }` sidebar entry and a nav link, and call the CI with
+(the max-models layout: the scripts are a Scripts group of the Examples section, next to the
+notebooks in `examples/`). Add `starlight-gallery convert` after `starlight-notebooks convert` in the
+`dev` and `build` scripts, a `{ label: 'Scripts', items: [{ autogenerate: { directory: 'example-scripts' } }] }`
+entry in the Examples sidebar group, and call the CI with
 `gallery: true` to run the scripts there. Locally, `starlight-gallery execute` runs the scripts that
 changed (`--force` all of them).
 
@@ -354,7 +359,7 @@ jobs:
     uses: max-models/starlight-theme/.github/workflows/docs.yml@v0
     with:
       smoke-paths: |
-        tutorials/index.html
+        examples/index.html
         api/simgeometry/index.html
 ```
 
