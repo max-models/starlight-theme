@@ -1,9 +1,10 @@
 ---
 // Starlight's hero (the `hero` frontmatter of a home page) on a header picture across the whole
-// width: by default streamlines of the flow past a cylinder in the accent colour, a different one per
-// site (seeded by the site title); `heroBackground` in the frontmatter sets an image of the site's
-// own instead, or `false` for none. Tracer dots drift along the streamlines (still for readers who
-// prefer reduced motion). Above the title, the latest release (lib/release.ts); below the buttons,
+// width: the site's own animated figure from `src/assets/hero.svg` when it has one (written with
+// plasma-plots' `plasma_plots.hero`, coloured by the classes below), otherwise streamlines of the flow
+// past a cylinder in the accent colour, a different one per site (seeded by the site title);
+// `heroBackground` in the frontmatter sets an image instead, or `false` for none. The animations
+// stand still for readers who prefer reduced motion. Above the title, the latest release (lib/release.ts); below the buttons,
 // `heroInstall` from the frontmatter as a command to copy. The theme plugin replaces Hero with this one.
 import { Image } from 'astro:assets';
 import config from 'virtual:starlight/user-config';
@@ -43,8 +44,12 @@ if (image) {
 	}
 }
 
+// the site's figure, looked up in the project that builds (a leading / is its root)
+const figures = import.meta.glob<string>('/src/assets/hero.svg', { query: '?raw', import: 'default', eager: true });
+const figure = background === undefined ? Object.values(figures)[0] : undefined;
+
 const siteTitle = typeof config.title === 'string' ? config.title : Object.values(config.title)[0];
-const pattern = background === undefined ? heroPattern(siteTitle ?? data.title) : undefined;
+const pattern = background === undefined && !figure ? heroPattern(siteTitle ?? data.title) : undefined;
 const backgrounds = background ? ('dark' in background ? [background.dark, background.light] : [background]) : [];
 ---
 
@@ -52,6 +57,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	{
 		background !== false && (
 			<div class="backdrop" aria-hidden="true">
+				{figure && <Fragment set:html={figure.replace('<svg ', '<svg class="hero-figure" ')} />}
 				{pattern && (
 					<svg class="streamlines" viewBox={`0 0 ${pattern.width} ${pattern.height}`} preserveAspectRatio="xMidYMid slice">
 						<g fill="none" stroke-width="1.5">
@@ -134,7 +140,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 <script>
 	// the dots stand still for readers who prefer reduced motion, spread along their lines
 	const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-	const svg = document.querySelector<SVGSVGElement>('.hero .streamlines');
+	const svg = document.querySelector<SVGSVGElement>('.hero .backdrop svg');
 	const apply = () => (reduce.matches ? svg?.pauseAnimations() : svg?.unpauseAnimations());
 	apply();
 	reduce.addEventListener('change', apply);
@@ -175,6 +181,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	}
 
 	.streamlines,
+	.backdrop :global(.hero-figure),
 	.backdrop-image {
 		position: absolute;
 		inset: 0;
@@ -188,6 +195,18 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	.streamlines {
 		stroke: var(--sl-color-accent);
 	}
+
+	/* the tones of a plasma_plots.hero figure: s- strokes, f- fills */
+	.backdrop :global(.s-accent) { stroke: var(--sl-color-accent); }
+	.backdrop :global(.s-high) { stroke: var(--sl-color-accent-high); }
+	.backdrop :global(.s-low) { stroke: var(--sl-color-accent-low); }
+	.backdrop :global(.s-muted) { stroke: var(--sl-color-gray-4); }
+	.backdrop :global(.s-bg) { stroke: var(--sl-color-bg); }
+	.backdrop :global(.f-accent) { fill: var(--sl-color-accent); }
+	.backdrop :global(.f-high) { fill: var(--sl-color-accent-high); }
+	.backdrop :global(.f-low) { fill: var(--sl-color-accent-low); }
+	.backdrop :global(.f-muted) { fill: var(--sl-color-gray-4); }
+	.backdrop :global(.f-bg) { fill: var(--sl-color-bg); }
 
 	.cylinder {
 		fill: var(--sl-color-bg);
@@ -326,6 +345,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 
 		/* full strength on the right, fading out behind the text on the left */
 		.streamlines,
+		.backdrop :global(.hero-figure),
 		.backdrop-image {
 			opacity: 1;
 			mask-image: linear-gradient(to right, transparent 15%, #000 55%);
