@@ -286,6 +286,8 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           enable-cache: true
+          # a site without a Python project leaves the uv cache empty
+          ignore-nothing-to-cache: true
 
       - uses: actions/setup-node@v7
         with:
