@@ -346,7 +346,8 @@ jobs:
 
 Inputs: `extras` (default `docs`; e.g. `docs mpi`), `apt-packages` (e.g.
 `libopenmpi-dev openmpi-bin`), `notebooks`, `gallery`, `xvfb` (run them under a virtual display, for
-PyVista scenes), `pre-build` (shell commands before the build, e.g.
+PyVista scenes), `pre-notebooks` (shell commands before the notebooks and gallery run, e.g.
+compiling kernels), `pre-build` (shell commands before the build, e.g.
 tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`), `stable-branch`,
 `python-version`, `node-version`, `project-dir`, `npm-lockfile`.
 

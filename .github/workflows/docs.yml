@@ -13,7 +13,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.6.1
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.6.2
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -80,6 +80,10 @@ on:
         description: Run the notebooks and gallery examples under a virtual display (xvfb), e.g. for PyVista scenes.
         type: boolean
         default: false
+      pre-notebooks:
+        description: Shell commands run in the project root after the install, before the notebooks and gallery run (e.g. compiling kernels).
+        type: string
+        default: ""
       pre-build:
         description: Shell commands run in the project root after the notebooks, before the build.
         type: string
@@ -240,6 +244,10 @@ jobs:
           path: ${{ env.CACHE_DIR }}/${{ matrix.slug }}.*
           key: notebook-${{ matrix.build }}-${{ matrix.slug }}-${{ hashFiles(format('{0}/**/*.ipynb', inputs.project-dir), format('{0}/**/*.py', inputs.project-dir), format('{0}/pyproject.toml', inputs.project-dir), format('{0}/uv.lock', inputs.project-dir)) }}
 
+      - name: Project-specific setup
+        if: inputs.pre-notebooks != ''
+        run: ${{ inputs.pre-notebooks }}
+
       - name: Execute the notebook
         working-directory: ${{ inputs.project-dir }}/docs
         env:
@@ -326,6 +334,10 @@ jobs:
           pattern: notebook-${{ matrix.name }}-*
           merge-multiple: true
           path: ${{ inputs.project-dir }}/docs/.cache/notebooks
+
+      - name: Project-specific setup
+        if: (inputs.notebooks || inputs.gallery) && inputs.pre-notebooks != ''
+        run: ${{ inputs.pre-notebooks }}
 
       - name: Execute and convert the notebooks
         if: inputs.notebooks
