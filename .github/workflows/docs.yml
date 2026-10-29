@@ -105,6 +105,7 @@ jobs:
       builds: ${{ steps.plan.outputs.builds }}
       deploy: ${{ steps.plan.outputs.deploy }}
       notebooks: ${{ steps.notebooks.outputs.matrix }}
+      serial: ${{ steps.notebooks.outputs.serial || '[]' }}
     steps:
       - id: plan
         env:
@@ -131,8 +132,10 @@ jobs:
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
           echo "deploy: $deploy, builds: $builds"
 
-      # One job per (build, notebook), listed at the ref of each build. The listing needs only
-      # the theme's tools/notebooks.py and the standard library (python3 of the runner).
+      # One job per (build, notebook), listed at the ref of each build with the theme that ref
+      # installs. The listing needs only the theme's tools/notebooks.py and the standard library
+      # (python3 of the runner). A ref whose theme cannot list them (older than 0.6.0, e.g. main
+      # before its first release with it) runs its notebooks in its build, one after another.
       - uses: actions/checkout@v7
         if: inputs.notebooks && inputs.parallel-notebooks
         with:
@@ -152,18 +155,24 @@ jobs:
           BUILDS: ${{ steps.plan.outputs.builds }}
           PROJECT: ${{ inputs.project-dir }}
         run: |
-          (cd "$PROJECT/docs" && npm ci --ignore-scripts)
           matrix='[]'
+          serial='[]'
           for build in $(jq -c '.[]' <<< "$BUILDS"); do
             name=$(jq -r .name <<< "$build")
             ref=$(jq -r .ref <<< "$build")
             if [ -n "$ref" ]; then git checkout -q "origin/$ref"; else git checkout -q "$GITHUB_SHA"; fi
-            slugs=$(cd "$PROJECT/docs" && DOCS_PYTHON=python3 npx starlight-notebooks list)
-            matrix=$(jq -c --argjson slugs "$slugs" --argjson build "$build" \
-              '. + [$slugs[] | {build: $build.name, ref: $build.ref, slug: .}]' <<< "$matrix")
+            (cd "$PROJECT/docs" && npm ci --ignore-scripts --no-audit --no-fund > /dev/null)
+            if slugs=$(cd "$PROJECT/docs" && DOCS_PYTHON=python3 npx starlight-notebooks list); then
+              matrix=$(jq -c --argjson slugs "$slugs" --argjson build "$build" \
+                '. + [$slugs[] | {build: $build.name, ref: $build.ref, slug: .}]' <<< "$matrix")
+            else
+              echo "$name: the theme cannot list the notebooks; running them in the build"
+              serial=$(jq -c --arg name "$name" '. + [$name]' <<< "$serial")
+            fi
           done
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          echo "notebooks: $matrix"
+          echo "serial=$serial" >> "$GITHUB_OUTPUT"
+          echo "notebooks: $matrix, serial builds: $serial"
 
   notebook:
     needs: plan
@@ -259,6 +268,8 @@ jobs:
     env:
       DOCS_PYTHON: ${{ github.workspace }}/${{ inputs.project-dir }}/.venv/bin/python
       DOCS_CHANNEL: ${{ matrix.channel }}
+      # the notebooks of this build ran in the notebook jobs
+      PARALLEL: ${{ inputs.parallel-notebooks && !contains(fromJSON(needs.plan.outputs.serial), matrix.name) }}
       DOCS_STABLE_BRANCH: ${{ inputs.stable-branch }}
       # The release branch (stable-branch, else main) builds against PyPI only; anything else uses
       # the [tool.uv.sources] devel branches. The caller's env does not reach a reusable workflow.
@@ -303,7 +314,7 @@ jobs:
         run: npm ci
 
       - uses: actions/download-artifact@v8
-        if: inputs.notebooks && inputs.parallel-notebooks && needs.notebook.result == 'success'
+        if: inputs.notebooks && env.PARALLEL == 'true' && needs.notebook.result == 'success'
         with:
           pattern: notebook-${{ matrix.name }}-*
           merge-multiple: true
@@ -314,7 +325,6 @@ jobs:
         working-directory: ${{ inputs.project-dir }}/docs
         env:
           RUN: ${{ inputs.xvfb && 'xvfb-run -a' || '' }}
-          PARALLEL: ${{ inputs.parallel-notebooks }}
         run: |
           # in parallel the notebook jobs ran them; convert --strict fails on any missing run
           if [ "$PARALLEL" != true ]; then $RUN npx starlight-notebooks execute; fi
