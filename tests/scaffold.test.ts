@@ -99,12 +99,15 @@ describe('scaffold', () => {
 		const pkg = JSON.parse(files['docs/package.json']);
 		expect(pkg.dependencies['@max-models/starlight-theme']).toBe(`github:max-models/starlight-theme#v${themePackage.version.split('.')[0]}`);
 		expect(pkg.scripts.build).toBe('starlight-notebooks convert && starlight-gallery convert && starlight-check-mdx && astro build');
+		expect(pkg['starlight-notebooks']).toEqual({ section: 'examples' });
+		expect(pkg['starlight-gallery']).toEqual({ section: 'example-scripts', title: 'Scripts' });
 		expect(files['docs/.gitignore']).toContain('src/content/docs/examples/*.mdx');
+		expect(files['docs/.gitignore']).toContain('src/content/docs/example-scripts/*.mdx');
 		const index = files['docs/src/content/docs/index.mdx'];
 		expect(index).toContain('link: /grids/getting-started/installation/');
 		expect(index).toContain('heroInstall: "pip install git+https://github.com/max-models/grids"');
 		expect(index).toContain('<StartHere />');
-		expect(index).toContain('<Card title="Gallery"');
+		expect(index).toContain('<Card title="Examples"');
 		expect(JSON.parse(files['renovate.json']).extends).toContain('github>max-models/starlight-theme:renovate-preset');
 	});
 
@@ -112,11 +115,14 @@ describe('scaffold', () => {
 		const config = astroConfig(full);
 		expect(config).toContain("title: 'Grids\\' site',");
 		expect(config).toContain("{ label: 'API', link: '/api/grids/', section: '/api/', description: 'Generated from the docstrings.' },");
-		expect(config).toContain("{ label: 'Gallery', items: [{ autogenerate: { directory: 'examples' } }] },");
+		expect(config).toContain(
+			"{ label: 'Examples', items: [{ autogenerate: { directory: 'examples' } }, { label: 'Scripts', items: [{ autogenerate: { directory: 'example-scripts' } }] }] },",
+		);
+		expect(astroConfig({ ...full, tutorials: false })).toContain("link: '/example-scripts/'");
 		expect(config).not.toContain('owner:');
 		const bare = astroConfig({ ...full, owner: 'someone', pythonPackage: undefined, tutorials: false, gallery: false });
 		expect(bare).toContain("owner: 'someone',");
-		expect(bare).not.toMatch(/Tutorials|Gallery|API|pythonPackage/);
+		expect(bare).not.toMatch(/Examples|API|pythonPackage/);
 	});
 
 	it('writes a workflow that calls the reusable one of this major tag', () => {
@@ -124,7 +130,7 @@ describe('scaffold', () => {
 		expect(parsed.jobs.docs.uses).toBe(`max-models/starlight-theme/.github/workflows/docs.yml@v${themePackage.version.split('.')[0]}`);
 		expect(parsed.jobs.docs.with).toEqual({
 			gallery: true,
-			'smoke-paths': 'tutorials/index.html\nexamples/index.html\napi/grids/index.html\n',
+			'smoke-paths': 'examples/index.html\nexample-scripts/index.html\napi/grids/index.html\n',
 		});
 		expect(parse(workflow({ ...full, tutorials: false, gallery: false, pythonPackage: undefined }, versions)).jobs.docs.with).toEqual({
 			notebooks: false,
