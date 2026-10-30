@@ -231,6 +231,16 @@ set, the pages get "Open in Colab" / "Launch Binder" buttons, except for noteboo
 MPI ranks or with the metadata `docs_launch: false`. See the docstring of `tools/notebooks.py` for
 the rest.
 
+#### Interactive Plotly figures
+
+A cell whose output is a Plotly figure (`fig.show()`, or a plasma-plots plot with
+`backend="plotly"`) becomes an interactive chart in the site's light/dark theme: the tool writes
+the output's `application/vnd.plotly.v1+json` to `<n>.plotly.json` next to the page's images and
+shows it with `PlotlyFigure`, the component of the gallery. plotly.js loads only when the figure
+scrolls into view. A `"plotly-figure"` metadata dict with a `title` adds a caption below it
+(plasma-plots sets one: `display_bundle(fig, title=...)`). With plasma-plots,
+`plasma_plots.set_backend("plotly")` at the top of a notebook makes every plot interactive.
+
 #### Interactive 3-D scenes
 
 A cell can show a PyVista scene that the reader can rotate: the page shows a picture of it and an
