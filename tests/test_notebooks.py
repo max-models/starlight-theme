@@ -267,6 +267,48 @@ def test_pyvista_scene(project, monkeypatch):
     assert sorted(p.name for p in public.iterdir()) == ["1.png", "scenes.ipynb"]
 
 
+def test_plotly_figure(project, monkeypatch):
+    v4 = nbformat.v4
+    spec = {"data": [{"type": "scatter", "x": [0, 1], "y": [1, 2]}], "layout": {}}
+    tagged = v4.new_output(
+        "display_data",
+        data={
+            "application/vnd.plotly.v1+json": spec,
+            "text/html": "<div>inline-plotly-html</div>",
+            "text/plain": "<Plotly figure>",
+        },
+        metadata={"plotly-figure": {"title": "Density *profile*"}},
+    )
+    plain = v4.new_output(
+        "execute_result",
+        data={"application/vnd.plotly.v1+json": spec, "text/html": "<div></div>"},
+    )
+    cells = [
+        v4.new_markdown_cell("# Figures"),
+        v4.new_code_cell("plot(backend='plotly')", outputs=[tagged]),
+        v4.new_code_cell("fig.show()", outputs=[plain]),
+    ]
+    write_notebook(project / "guides" / "figures.ipynb", cells)
+    cache = project / "docs" / ".cache" / "notebooks"
+    cache.mkdir(parents=True)
+    write_notebook(cache / "figures.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+
+    page = (
+        project / "docs" / "src" / "content" / "docs" / "guides" / "figures.mdx"
+    ).read_text()
+    assert (
+        "import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.astro';"
+        in page
+    )
+    assert '<PlotlyFigure src="/guides/figures/1.plotly.json" />' in page
+    assert '<PlotlyFigure src="/guides/figures/2.plotly.json" />' in page
+    assert "Density" in page and "profile" in page
+    assert "inline-plotly-html" not in page  # not inlined as HTML
+    public = project / "docs" / "public" / "guides" / "figures"
+    assert json.loads((public / "1.plotly.json").read_text()) == spec
+
+
 def test_pyvista_scene_without_picture(project, monkeypatch):
     v4 = nbformat.v4
     cells = [

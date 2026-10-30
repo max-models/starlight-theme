@@ -42,7 +42,10 @@ Outputs: images become files next to the page (NotebookImage), HTML and SVG are 
 An output whose metadata has a ``"pyvista-scene"`` dict (optional ``alt`` and ``title``) is a 3-D
 PyVista scene: its ``text/html`` (the standalone page of ``plotter.trame.export_html``) and
 ``image/png`` go to ``<n>.html`` and ``<n>.png`` next to the images, shown by PyVistaScene as the
-picture with a button that loads the interactive scene.
+picture with a button that loads the interactive scene. An output with Plotly's
+``application/vnd.plotly.v1+json`` (what ``fig.show()`` and plasma-plots' ``backend="plotly"``
+display; an optional ``"plotly-figure"`` metadata dict may give a ``title``) is written to
+``<n>.plotly.json`` and shown interactively by PlotlyFigure, in the site's theme.
 
 Usage: starlight-notebooks <execute|convert|clean> [options]   (in docs/, or with --docs)
 """
@@ -492,6 +495,24 @@ def convert_scene(data: dict, scene: dict, page: Page) -> str:
     return f"<PyVistaScene {' '.join(props)} />"
 
 
+PLOTLY_MIME = "application/vnd.plotly.v1+json"
+
+
+def convert_plotly(data: dict, figure: dict, page: Page) -> str:
+    """A Plotly figure: its JSON next to the images, shown interactively by PlotlyFigure."""
+    figure = figure if isinstance(figure, dict) else {}
+    spec = data[PLOTLY_MIME]
+    if isinstance(spec, (str, list)):  # nbformat may keep it as text
+        spec = json.loads(_text(spec))
+    path, url = page.asset(".plotly.json")
+    path.write_text(json.dumps(spec, separators=(",", ":")), encoding="utf-8")
+    page.components.add("PlotlyFigure")
+    tag = f'<PlotlyFigure src="{url}" />'
+    if figure.get("title"):
+        tag += f"\n\n*{sanitize_markdown(str(figure['title'])).strip()}*"
+    return tag
+
+
 def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str:
     kind = output.get("output_type")
     if kind == "stream":
@@ -506,6 +527,8 @@ def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str
     scene = output.get("metadata", {}).get("pyvista-scene")
     if scene is not None and "text/html" in data:
         return convert_scene(data, scene, page)
+    if PLOTLY_MIME in data:
+        return convert_plotly(data, output.get("metadata", {}).get("plotly-figure"), page)
     mime = next((mime for mime in _IMAGES if mime in data), None)
     if mime is not None:  # a GIF is an animation, e.g. from IPython.display.Image
         path, url = page.asset(_IMAGES[mime])
