@@ -25,7 +25,7 @@ its pages import always come in matching versions.
 In the root of a project, without installing anything first:
 
 ```sh
-npx --package github:max-models/starlight-theme#v0.5.0 starlight-theme-init
+npx --package github:max-models/starlight-theme#v0 starlight-theme-init
 cd docs && npm install
 ```
 
@@ -40,7 +40,7 @@ and swaps their dependencies in the existing `docs/package.json` for the theme.
 By hand, in `docs/`:
 
 ```sh
-npm install github:max-models/starlight-theme#v0.5.0
+npm install github:max-models/starlight-theme#v0
 ```
 
 `docs/package.json` then needs only:
@@ -49,7 +49,7 @@ npm install github:max-models/starlight-theme#v0.5.0
 {
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
-    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0.5.0",
+    "@max-models/starlight-theme": "github:max-models/starlight-theme#v0",
     "astro": "^7.3.8",
     "sharp": "^0.35.3"
   }
@@ -69,13 +69,13 @@ export default defineDocs({
 	pythonPackage: 'simgeometry', // adds an "API reference" sidebar group
 	nav: [
 		{ label: 'Getting started', link: '/getting-started/installation/' },
-		{ label: 'Tutorials', link: '/tutorials/' },
+		{ label: 'Examples', link: '/examples/' },
 		{ label: 'Development', link: '/development/docs/' },
 		{ label: 'API', link: '/api/simgeometry/', section: '/api/' },
 	],
 	sidebar: [
 		{ label: 'Getting started', items: [{ label: 'Installation', slug: 'getting-started/installation' }] },
-		{ label: 'Tutorials', items: [{ autogenerate: { directory: 'tutorials' } }] },
+		{ label: 'Examples', items: [{ autogenerate: { directory: 'examples' } }] },
 	],
 });
 ```
@@ -212,6 +212,9 @@ the nearest `.venv`, else `python3`), which needs `nbclient`, `nbformat` and `ip
 "starlight-notebooks": { "source": "../guides", "mpiRanks": 4 }
 ```
 
+The max-models projects keep the notebooks in `tutorials/` and publish them in one Examples
+section with `"section": "examples"`; the scaffold sets this up.
+
 `source` is the notebook directory, which may have subdirectories (the pages are named after
 the notebooks alone, so the directories only organise the sources), `section` the URL section
 (default: the directory name),
@@ -227,6 +230,16 @@ the tool writes an index page with only the grid (`"grid": false` turns it off).
 set, the pages get "Open in Colab" / "Launch Binder" buttons, except for notebooks run on several
 MPI ranks or with the metadata `docs_launch: false`. See the docstring of `tools/notebooks.py` for
 the rest.
+
+#### Interactive Plotly figures
+
+A cell whose output is a Plotly figure (`fig.show()`, or a plasma-plots plot with
+`backend="plotly"`) becomes an interactive chart in the site's light/dark theme: the tool writes
+the output's `application/vnd.plotly.v1+json` to `<n>.plotly.json` next to the page's images and
+shows it with `PlotlyFigure`, the component of the gallery. plotly.js loads only when the figure
+scrolls into view. A `"plotly-figure"` metadata dict with a `title` adds a caption below it
+(plasma-plots sets one: `display_bundle(fig, title=...)`). With plasma-plots,
+`plasma_plots.set_backend("plotly")` at the top of a notebook makes every plot interactive.
 
 #### Interactive 3-D scenes
 
@@ -310,11 +323,13 @@ pages are named after the scripts alone); `README.md` in the directory is the in
 gallery page. Settings, in `docs/package.json`:
 
 ```json
-"starlight-gallery": { "source": "../examples", "section": "examples", "title": "Gallery" }
+"starlight-gallery": { "source": "../examples", "section": "example-scripts", "title": "Scripts" }
 ```
 
-Add `starlight-gallery convert` after `starlight-notebooks convert` in the `dev` and `build` scripts, a
-`{ autogenerate: { directory: 'examples' } }` sidebar entry and a nav link, and call the CI with
+(the max-models layout: the scripts are a Scripts group of the Examples section, next to the
+notebooks in `examples/`). Add `starlight-gallery convert` after `starlight-notebooks convert` in the
+`dev` and `build` scripts, a `{ label: 'Scripts', items: [{ autogenerate: { directory: 'example-scripts' } }] }`
+entry in the Examples sidebar group, and call the CI with
 `gallery: true` to run the scripts there. Locally, `starlight-gallery execute` runs the scripts that
 changed (`--force` all of them).
 
@@ -351,10 +366,10 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   docs:
-    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.5.0
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0
     with:
       smoke-paths: |
-        tutorials/index.html
+        examples/index.html
         api/simgeometry/index.html
 ```
 
@@ -380,7 +395,8 @@ in `[tool.uv.sources]`.
 ### Renovate
 
 The `renovate.json` that `starlight-theme-init` writes extends the theme's preset, which bumps the
-theme in `docs/package.json` and the tag of the docs workflow in one pull request:
+theme in `docs/package.json` and the tag of the docs workflow in one pull request. On the major tag
+(`#v0`, `@v0`) that is only needed for a new major:
 
 ```json
 {
@@ -419,10 +435,14 @@ Work happens on `devel`; `main` holds the releases.
 | `test_pytest.yml` | push / pull request to `main` or `devel` | tests of the notebook and gallery tools |
 | `test_vitest.yml` | push / pull request to `main` or `devel` | tests of `defineDocs`, the plugin and `starlight-theme-init` |
 | `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `main` and to <https://max-models.github.io/starlight-theme/dev/> from `devel` |
-| `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already |
+| `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already; moves the major tag (`v0`) and reruns the docs of the sites on it |
 | `docs.yml` | called by the projects | the reusable docs build |
 
-To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. Projects then
-update with `npm install github:max-models/starlight-theme#vX.Y.Z` in `docs/` and the same tag in
-their docs workflow; the Renovate preset opens those bumps. A new project with a docs site goes
+To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. The release
+workflow tags `vX.Y.Z`, moves the major tag (`v0`) to it and reruns the docs of every site whose
+workflow uses `docs.yml@v0` (with a `DOCS_DISPATCH_TOKEN` secret: a token with actions write and
+contents read on the sites; without it they pick the release up on their next push). Projects
+need no bump: the reusable workflow installs the theme of its own major tag over the lockfile's
+(`theme-ref`, `v0` by default; an exact tag pins a site, `""` uses the lockfile). Only a new major
+(`v1`) is a bump in each project. A new project with a docs site goes
 into `lib/projects.ts`, for the projects menu and the cross-references.

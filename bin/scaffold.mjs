@@ -91,9 +91,11 @@ const js = (text) => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
 /** The theme dependency and the versions of its peers, from the theme's own package.json. */
 export function themeVersions(themePackage) {
+	// the major tag (v0 for 0.x), which every release of that major moves forward
+	const major = `v${themePackage.version.split('.')[0]}`;
 	return {
-		theme: `github:max-models/starlight-theme#v${themePackage.version}`,
-		tag: `v${themePackage.version}`,
+		theme: `github:max-models/starlight-theme#${major}`,
+		tag: major,
 		starlight: themePackage.devDependencies['@astrojs/starlight'],
 		astro: themePackage.devDependencies.astro,
 		sharp: '^0.35.3',
@@ -115,6 +117,14 @@ function scripts(project) {
 	};
 }
 
+/** Notebooks and scripts share one Examples section: the notebooks at /examples/, the scripts at /example-scripts/. */
+function sections(project) {
+	return {
+		...(project.tutorials ? { 'starlight-notebooks': { section: 'examples' } } : {}),
+		...(project.gallery ? { 'starlight-gallery': { section: 'example-scripts', title: 'Scripts' } } : {}),
+	};
+}
+
 export function packageJson(project, versions) {
 	return {
 		name: `${project.repo}-docs`,
@@ -123,6 +133,7 @@ export function packageJson(project, versions) {
 		version: '0.0.0',
 		engines: { node: '>=22.12.0' },
 		scripts: scripts(project),
+		...sections(project),
 		dependencies: {
 			'@astrojs/starlight': versions.starlight,
 			[THEME]: versions.theme,
@@ -144,19 +155,27 @@ export function migratePackageJson(existing, project, versions) {
 	return { ...existing, scripts: { ...scripts(project), ...existing.scripts }, dependencies: sorted };
 }
 
+function examplesItems(project) {
+	return [
+		project.tutorials && `{ autogenerate: { directory: 'examples' } }`,
+		project.gallery && `{ label: 'Scripts', items: [{ autogenerate: { directory: 'example-scripts' } }] }`,
+	]
+		.filter(Boolean)
+		.join(', ');
+}
+
 export function astroConfig(project) {
 	// the descriptions show in the <StartHere /> grid of the home page
 	const nav = [
 		`{ label: 'Getting started', link: '/getting-started/installation/', description: 'Install the package.' }`,
-		project.tutorials && `{ label: 'Tutorials', link: '/tutorials/', description: 'Notebooks, run and converted to pages.' }`,
-		project.gallery && `{ label: 'Gallery', link: '/examples/', description: 'Example scripts and their figures.' }`,
+		(project.tutorials || project.gallery) &&
+			`{ label: 'Examples', link: '${project.tutorials ? '/examples/' : '/example-scripts/'}', description: 'Notebooks and scripts, run in CI with their output.' }`,
 		project.pythonPackage &&
 			`{ label: 'API', link: ${js(`/api/${project.pythonPackage}/`)}, section: '/api/', description: 'Generated from the docstrings.' }`,
 	].filter(Boolean);
 	const sidebar = [
 		`{ label: 'Getting started', items: [{ label: 'Installation', slug: 'getting-started/installation' }] }`,
-		project.tutorials && `{ label: 'Tutorials', items: [{ autogenerate: { directory: 'tutorials' } }] }`,
-		project.gallery && `{ label: 'Gallery', items: [{ autogenerate: { directory: 'examples' } }] }`,
+		(project.tutorials || project.gallery) && `{ label: 'Examples', items: [${examplesItems(project)}] }`,
 	].filter(Boolean);
 	const lines = [
 		`\trepo: ${js(project.repo)},`,
@@ -180,8 +199,8 @@ ${lines.join('\n')}
 
 function gitignore(project) {
 	const generated = [
-		project.tutorials && 'public/tutorials/\nsrc/content/docs/tutorials/*.mdx',
-		project.gallery && 'public/examples/\nsrc/content/docs/examples/*.mdx',
+		project.tutorials && 'public/examples/\nsrc/content/docs/examples/*.mdx',
+		project.gallery && 'public/example-scripts/\nsrc/content/docs/example-scripts/*.mdx',
 	].filter(Boolean);
 	return `# Astro
 dist/
@@ -197,8 +216,8 @@ function indexPage(project) {
 	const features = [
 		project.pythonPackage &&
 			`\t<Card title=${JSON.stringify(project.pythonPackage)} icon="rocket">\n\t\t{${JSON.stringify(project.description || 'What the package does.')}}\n\t</Card>`,
-		project.tutorials && `\t<Card title="Tutorials" icon="open-book">\n\t\tNotebooks that run in CI, so their output matches the code.\n\t</Card>`,
-		project.gallery && `\t<Card title="Gallery" icon="seti:image">\n\t\tExample scripts with their figures.\n\t</Card>`,
+		(project.tutorials || project.gallery) &&
+			`\t<Card title="Examples" icon="open-book">\n\t\tNotebooks and scripts that run in CI, so their output matches the code.\n\t</Card>`,
 	].filter(Boolean);
 	return `---
 title: ${JSON.stringify(project.title)}
@@ -252,8 +271,8 @@ ${installCommand(project)}
 
 export function workflow(project, versions) {
 	const smoke = [
-		project.tutorials && 'tutorials/index.html',
-		project.gallery && 'examples/index.html',
+		project.tutorials && 'examples/index.html',
+		project.gallery && 'example-scripts/index.html',
 		project.pythonPackage && `api/${project.pythonPackage}/index.html`,
 	].filter(Boolean);
 	const inputs = [

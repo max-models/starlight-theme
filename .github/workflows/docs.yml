@@ -13,7 +13,7 @@ name: Docs
 #   concurrency: { group: "docs-${{ github.ref }}", cancel-in-progress: true }
 #   jobs:
 #     docs:
-#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0.7.0
+#       uses: max-models/starlight-theme/.github/workflows/docs.yml@v0
 #       with:
 #         stable-branch: main
 #         smoke-paths: |
@@ -46,6 +46,12 @@ on:
         description: The project root (pyproject.toml and docs/), relative to the repository.
         type: string
         default: "."
+      theme-ref:
+        description: >-
+          The theme release the site is built with, installed over the one in the lockfile: the
+          major tag (v0 moves to every 0.x release), an exact tag, or empty for the lockfile's.
+        type: string
+        default: v0
       npm-lockfile:
         description: The npm lockfile, relative to the repository (for the cache).
         type: string
@@ -161,6 +167,7 @@ jobs:
         env:
           BUILDS: ${{ steps.plan.outputs.builds }}
           PROJECT: ${{ inputs.project-dir }}
+          THEME_REF: ${{ inputs.theme-ref }}
         run: |
           matrix='[]'
           serial='[]'
@@ -169,6 +176,7 @@ jobs:
             ref=$(jq -r .ref <<< "$build")
             if [ -n "$ref" ]; then git checkout -q "origin/$ref"; else git checkout -q "$GITHUB_SHA"; fi
             (cd "$PROJECT/docs" && npm ci --ignore-scripts --no-audit --no-fund > /dev/null)
+            if [ -n "$THEME_REF" ]; then (cd "$PROJECT/docs" && npm install --no-save --ignore-scripts --no-audit --no-fund "@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF" > /dev/null); fi
             if slugs=$(cd "$PROJECT/docs" && DOCS_PYTHON=python3 npx starlight-notebooks list); then
               matrix=$(jq -c --argjson slugs "$slugs" --argjson build "$build" \
                 '. + [$slugs[] | {build: $build.name, ref: $build.ref, slug: .}]' <<< "$matrix")
@@ -234,7 +242,11 @@ jobs:
 
       - name: Install the npm packages
         working-directory: ${{ inputs.project-dir }}/docs
-        run: npm ci
+        env:
+          THEME_REF: ${{ inputs.theme-ref }}
+        run: |
+          npm ci
+          if [ -n "$THEME_REF" ]; then npm install --no-save --ignore-scripts --no-audit --no-fund "@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF"; fi
 
       # The executed copy of an earlier run, reused when nothing it may depend on changed: the
       # notebooks, the Python sources and the locked dependencies. The tool still reruns the
@@ -326,7 +338,11 @@ jobs:
 
       - name: Install the npm packages
         working-directory: ${{ inputs.project-dir }}/docs
-        run: npm ci
+        env:
+          THEME_REF: ${{ inputs.theme-ref }}
+        run: |
+          npm ci
+          if [ -n "$THEME_REF" ]; then npm install --no-save --ignore-scripts --no-audit --no-fund "@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF"; fi
 
       - uses: actions/download-artifact@v8
         if: inputs.notebooks && env.PARALLEL == 'true' && needs.notebook.result == 'success'
