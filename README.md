@@ -221,8 +221,9 @@ the notebooks alone, so the directories only organise the sources), `section` th
 `mpiRanks` runs every notebook under `mpiexec -n <ranks>` when mpi4py and an MPI launcher are
 installed (`DOCS_MPI_RANKS=1` for a quick serial run). The cell tags `remove-cell`, `hide-input`,
 `fold-input`, `fold-output` (outputs in a closed box, titled by the cell metadata `fold_summary`),
-`remove-output`, `raises-exception` and nbclient's `skip-execution` are honoured, and notebook
-metadata `docs_order` sets the sidebar position.
+`remove-output`, `raises-exception` and nbclient's `skip-execution` are honoured, notebook
+metadata `docs_order` sets the sidebar position, and `docs_timeout` the seconds per cell of that
+notebook (default 600; e.g. for a first cell that installs and compiles a Julia package).
 
 The index page of the section has a grid of cards of the other notebooks, with their first image:
 at the end of `index.ipynb`, or after its cell tagged `notebook-grid`; without an index notebook
