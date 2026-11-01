@@ -360,9 +360,11 @@ def test_execute_only(project, monkeypatch):
         run(project, "execute", "--only", "three", monkeypatch=monkeypatch)
 
 
-@pytest.mark.parametrize(("metadata", "expected"), [({}, 600), ({"docs_timeout": 3600}, 3600)])
+@pytest.mark.parametrize(
+    ("metadata", "expected"), [({}, 600), ({"docs_timeout": 3600}, 3600)]
+)
 def test_execute_timeout_per_notebook(tmp_path, monkeypatch, metadata, expected):
-    import nbclient
+    import types
 
     source = tmp_path / "slow.ipynb"
     write_notebook(source, [nbformat.v4.new_code_cell("1")], **metadata)
@@ -375,7 +377,9 @@ def test_execute_timeout_per_notebook(tmp_path, monkeypatch, metadata, expected)
         def execute(self):
             pass
 
-    monkeypatch.setattr(nbclient, "NotebookClient", FakeClient)
+    # nbclient itself is not needed: execute_notebook imports NotebookClient from it
+    fake = types.SimpleNamespace(NotebookClient=FakeClient)
+    monkeypatch.setitem(sys.modules, "nbclient", fake)
     monkeypatch.setattr(notebooks, "_kernel_manager", lambda nranks: None)
     notebooks.execute_notebook(source, tmp_path / "out" / "slow.ipynb", 600, 1)
     assert timeouts == [expected]
