@@ -159,7 +159,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						search: ['../src'],
 						docstringStyle: 'google',
 						sourceLink: { host: 'github', repo: `${owner}/${options.repo}`, ref: sourceBranch, root: '..' },
-						sidebar: { collapsed: false },
+						sidebar: { collapsed: true },
 						...options.pydocs,
 						// a site's own excludes add to the tests, rather than replace them
 						members: {
@@ -181,7 +181,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 
 	const sidebar: Sidebar =
 		pkg && !containsPlaceholder(options.sidebar)
-			? [...options.sidebar, { label: 'API reference', items: [pydocsSidebarGroup] }]
+			? [...options.sidebar, { label: 'API reference', collapsed: true, items: [pydocsSidebarGroup] }]
 			: options.sidebar;
 
 	const { plugins: extraPlugins = [], ...starlightOverrides } = options.starlight ?? {};
