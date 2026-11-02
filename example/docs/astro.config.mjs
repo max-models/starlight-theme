@@ -42,7 +42,7 @@ export default defineDocs({
 	// run the tutorials in Colab or Binder from their pages
 	launch: ['colab', 'binder'],
 	// the method cards of example_pkg: a Numerics section on their API pages and /numerics/
-	methodcard: true,
+	methodcard: { pages: true, labels: { 'example_pkg.schemes': 'Time steps' } },
 	// \vect{E} in every page's math
 	math: { macros: { '\\vect': '\\boldsymbol{#1}' } },
 	astro: {

@@ -3,7 +3,15 @@ import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiLink, byModule, inlineHtml, excluded, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
+import {
+	apiLink,
+	byModule,
+	cardLink,
+	cardModules,
+	inlineHtml,
+	moduleLabel,
+	moduleSlug,
+	numericsSidebar, excluded, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
 
 vi.mock('@astrojs/starlight', () => ({ default: (options: unknown) => ({ name: 'starlight', options }) }));
 vi.mock('starlight-pydocs', () => ({
@@ -121,6 +129,56 @@ describe('helpers', () => {
 		expect(inlineHtml('[not a link](javascript:alert(1))', math)).toBe('[not a link](javascript:alert(1))');
 	});
 
+	it('names the module pages', () => {
+		expect(moduleSlug('freeofcharge.slowing_down')).toBe('slowing-down');
+		expect(moduleSlug('pkg.sub.module_name')).toBe('sub-module-name');
+		expect(moduleSlug('pkg')).toBe('pkg');
+		expect(moduleLabel('freeofcharge.slowing_down')).toBe('Slowing down');
+		expect(moduleLabel('freeofcharge.chain', { 'freeofcharge.chain': 'Injector chain' })).toBe('Injector chain');
+		expect(cardModules([card('pkg.b_c.f'), card('pkg.a.g')] as any, { 'pkg.a': 'First' })).toEqual([
+			{ module: 'pkg.a', slug: 'a', label: 'First' },
+			{ module: 'pkg.b_c', slug: 'b-c', label: 'B c' },
+		]);
+	});
+
+	it('links a card to its module page, the overview or the API', () => {
+		const target = { name: 'pkg.slowing_down.f', module: 'pkg.slowing_down' };
+		const config = { base: '/pkg', package: 'pkg', pages: true, index: true };
+		expect(cardLink(config, target)).toBe('/pkg/numerics/slowing-down/#pkg.slowing_down.f');
+		expect(cardLink({ ...config, pages: false }, target)).toBe('/pkg/numerics/#pkg.slowing_down.f');
+		expect(cardLink({ ...config, pages: false, index: false }, target)).toBe('/pkg/api/pkg/slowing_down/#pkg.slowing_down.f');
+	});
+
+	it('makes a sidebar link, or a group with the module pages', () => {
+		const modules = [{ module: 'pkg.a', slug: 'a', label: 'A' }];
+		const config = { title: 'Numerics', base: '/pkg', pages: false, index: true, modules };
+		expect(numericsSidebar(config)).toEqual([{ label: 'Numerics', link: '/numerics/' }]);
+		expect(numericsSidebar({ ...config, pages: true })).toEqual([
+			{
+				label: 'Numerics',
+				items: [
+					{ label: 'Overview', link: '/numerics/' },
+					{ label: 'A', link: '/numerics/a/' },
+				],
+			},
+		]);
+	});
+
+	it('injects the module pages, and the overview unless the site has its own', () => {
+		const routes = (pages: boolean, index: boolean) => {
+			const found: Any[] = [];
+			const config = { title: 'N', package: 'pkg', cards: [], macros: {}, base: '/pkg', source: '', pages, index, modules: [] };
+			(methodcardIntegration(config).hooks['astro:config:setup'] as any)({
+				injectRoute: (route: Any) => found.push(route.pattern),
+				updateConfig: () => {},
+			});
+			return found;
+		};
+		expect(routes(false, true)).toEqual(['/numerics']);
+		expect(routes(true, true)).toEqual(['/numerics', '/numerics/[module]']);
+		expect(routes(true, false)).toEqual(['/numerics/[module]']);
+	});
+
 	it('groups the cards by module', () => {
 		const groups = byModule([card('pkg.z.g'), card('pkg.a.f'), card('pkg.z.a')] as any);
 		expect(groups.map(([module, cards]) => [module, cards.map((c) => c.name)])).toEqual([
@@ -130,7 +188,7 @@ describe('helpers', () => {
 	});
 
 	it('serves the cards as a virtual module and injects the catalogue', () => {
-		const config = { title: 'Numerics', package: 'pkg', cards: [], macros: {}, base: '/pkg', source: '' };
+		const config = { title: 'Numerics', package: 'pkg', cards: [], macros: {}, base: '/pkg', source: '', pages: false, index: true, modules: [] };
 		const routes: Any[] = [];
 		let vite: Any;
 		(methodcardIntegration(config).hooks['astro:config:setup'] as any)({
@@ -182,7 +240,7 @@ describe('defineDocs({ methodcard })', () => {
 		expect(pydocs.extraRequirements).toEqual(['griffe-inherited-docstrings', 'methodcard']);
 		expect(runner).toEqual({ command: [process.env.DOCS_PYTHON, '-m', 'griffe'] });
 		expect(sidebar.map((item) => item.label)).toEqual(['Guides', 'Numerics', 'API reference']);
-		expect(sidebar[1].link).toBe('/pkg/numerics/');
+		expect(sidebar[1].link).toBe('/numerics/');
 		const links = build({ methodcard: true }).config.integrations[0].options.plugins.find((plugin: Any) => plugin.name === 'links').options;
 		expect(links.exclude).toEqual(expect.arrayContaining(['/pkg/numerics/', '/pkg/numerics/#*']));
 		const config = virtualConfig(integration);
@@ -196,11 +254,27 @@ describe('defineDocs({ methodcard })', () => {
 		expect(config.source).toMatch(/^https:\/\/github\.com\/max-models\/pkg\/blob\/devel\/.*\/$/);
 	});
 
+	it('adds the module pages to the sidebar with pages', () => {
+		vi.stubEnv('DOCS_PYTHON', fakePython(exported([card('pkg.chain.f'), card('pkg.slowing_down.g')])));
+		const { sidebar, integration } = build({ methodcard: { pages: true, index: false, labels: { 'pkg.chain': 'Injector chain' } } });
+		expect(sidebar[1]).toEqual({
+			label: 'Numerics',
+			items: [
+				{ label: 'Overview', link: '/numerics/' },
+				{ label: 'Injector chain', link: '/numerics/chain/' },
+				{ label: 'Slowing down', link: '/numerics/slowing-down/' },
+			],
+		});
+		const config = virtualConfig(integration);
+		expect(config).toMatchObject({ pages: true, index: false });
+		expect(config.modules.map((m: Any) => m.slug)).toEqual(['chain', 'slowing-down']);
+	});
+
 	it('takes a title and keeps the site integrations', () => {
 		vi.stubEnv('DOCS_PYTHON', fakePython(exported([])));
 		const extra = { name: 'extra', hooks: {} };
 		const { config, sidebar, integration } = build({ methodcard: { title: 'Methods' }, astro: { integrations: [extra] } });
-		expect(sidebar[1]).toEqual({ label: 'Methods', link: '/pkg/numerics/' });
+		expect(sidebar[1]).toEqual({ label: 'Methods', link: '/numerics/' });
 		expect(config.integrations.at(-1)).toBe(extra);
 		expect(virtualConfig(integration).title).toBe('Methods');
 	});

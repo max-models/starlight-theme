@@ -12,6 +12,28 @@ export interface MethodcardOptions {
 	title?: string;
 	/** Qualified names (or prefixes ending in ".") of the methods left out of the catalogue. */
 	exclude?: string[];
+	/**
+	 * One page per module at `<base>/numerics/<module>/`, and a sidebar group (the overview, then
+	 * the modules) instead of a single link. Default false.
+	 */
+	pages?: boolean;
+	/**
+	 * Generate the overview at `<base>/numerics/` (every card, by module). `false` leaves it to the
+	 * site: a hand-written `src/content/docs/numerics/index.mdx`. Default true.
+	 */
+	index?: boolean;
+	/** Sidebar and page titles of modules by qualified name, e.g. `{ 'pkg.chain': 'Injector chain' }`. */
+	labels?: Record<string, string>;
+}
+
+/** A module with cards: its page and label. */
+export interface MethodcardModule {
+	/** The qualified module name. */
+	module: string;
+	/** Its page, `<base>/numerics/<slug>/`. */
+	slug: string;
+	/** Its title in the sidebar and on its page. */
+	label: string;
 }
 
 /** One card, as `methodcard export` writes it. */
@@ -42,6 +64,12 @@ export interface MethodcardConfig {
 	base: string;
 	/** The source of the package on GitHub, to which a card's `filepath` is appended. */
 	source: string;
+	/** One page per module (see `MethodcardOptions.pages`). */
+	pages: boolean;
+	/** Whether the theme generates the overview page. */
+	index: boolean;
+	/** The modules with cards, in order. */
+	modules: MethodcardModule[];
 }
 
 /** The layout version of `methodcard export` this theme reads. */
@@ -141,6 +169,42 @@ export function byModule(cards: MethodCardData[]): [string, MethodCardData[]][] 
 	return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+/** The page of a module: its name without the package, `_` and `.` as `-` ("slowing-down"). */
+export function moduleSlug(module: string): string {
+	const rest = module.split('.').slice(1).join('-');
+	return (rest || module).replaceAll('_', '-').toLowerCase();
+}
+
+/** The title of a module: the label given, else its last part in words ("Slowing down"). */
+export function moduleLabel(module: string, labels: Record<string, string> = {}): string {
+	if (labels[module]) return labels[module];
+	const words = (module.split('.').at(-1) ?? module).replaceAll('_', ' ');
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The modules of the cards, sorted by name. */
+export function cardModules(cards: MethodCardData[], labels: Record<string, string> = {}): MethodcardModule[] {
+	return byModule(cards).map(([module]) => ({ module, slug: moduleSlug(module), label: moduleLabel(module, labels) }));
+}
+
+/** Where a card is shown: its module page, else the overview, else its API entry. */
+export function cardLink(config: Pick<MethodcardConfig, 'base' | 'package' | 'pages' | 'index'>, card: Pick<MethodCardData, 'name' | 'module'>): string {
+	if (config.pages) return `${config.base}/numerics/${moduleSlug(card.module)}/#${card.name}`;
+	if (config.index) return `${config.base}/numerics/#${card.name}`;
+	return apiLink(config.base, config.package, card);
+}
+
+/**
+ * The sidebar entry: a link to the overview, or with `pages` a group of the overview and the
+ * modules. Site-root paths: Starlight adds the base path to sidebar links itself.
+ */
+export function numericsSidebar(config: Pick<MethodcardConfig, 'title' | 'pages' | 'modules'>) {
+	const overview = { label: config.pages ? 'Overview' : config.title, link: '/numerics/' };
+	if (!config.pages) return [overview];
+	const modules = config.modules.map((module) => ({ label: module.label, link: `/numerics/${module.slug}/` }));
+	return [{ label: config.title, items: [overview, ...modules] }];
+}
+
 /** The Astro integration: the virtual module with the cards and the catalogue route. */
 export function methodcardIntegration(config: MethodcardConfig): AstroIntegration {
 	return {
@@ -158,7 +222,16 @@ export function methodcardIntegration(config: MethodcardConfig): AstroIntegratio
 						],
 					},
 				});
-				injectRoute({ pattern: '/numerics', entrypoint: '@max-models/starlight-theme/routes/numerics.astro', prerender: true });
+				if (config.index) {
+					injectRoute({ pattern: '/numerics', entrypoint: '@max-models/starlight-theme/routes/numerics.astro', prerender: true });
+				}
+				if (config.pages) {
+					injectRoute({
+						pattern: '/numerics/[module]',
+						entrypoint: '@max-models/starlight-theme/routes/numerics-module.astro',
+						prerender: true,
+					});
+				}
 			},
 		},
 	};

@@ -39,6 +39,7 @@ jobs:
         tutorials/first-steps/first_steps.ipynb
         api/example_pkg/index.html
         numerics/index.html
+        numerics/schemes/index.html
         guides/index.html
         examples/index.html
         examples/sine-waves/index.html
