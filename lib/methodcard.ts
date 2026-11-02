@@ -110,6 +110,25 @@ export function orderText(order: MethodCardData['order']): string {
 		.join(', ');
 }
 
+const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+const escapeHtml = (text: string) => text.replace(/[&<>"]/g, (char) => ESCAPES[char]);
+
+/**
+ * A docstring summary as inline HTML: ``code`` and `code` as code, $math$ through `math`
+ * (inline KaTeX), the rest escaped.
+ */
+export function inlineHtml(text: string, math: (tex: string) => string): string {
+	return text
+		.split(/(``[^`]+``|`[^`]+`|\$[^$]+\$)/)
+		.map((part) => {
+			if (/^``[^`]+``$/.test(part)) return `<code>${escapeHtml(part.slice(2, -2))}</code>`;
+			if (/^`[^`]+`$/.test(part)) return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
+			if (/^\$[^$]+\$$/.test(part)) return math(part.slice(1, -1));
+			return escapeHtml(part);
+		})
+		.join('');
+}
+
 /** The cards by module, in module order. */
 export function byModule(cards: MethodCardData[]): [string, MethodCardData[]][] {
 	const groups = new Map<string, MethodCardData[]>();

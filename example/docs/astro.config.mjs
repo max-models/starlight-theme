@@ -35,6 +35,7 @@ export default defineDocs({
 			items: [
 				{ label: 'Building the docs', slug: 'development/docs' },
 				{ label: 'Writing gallery examples', slug: 'development/gallery' },
+				{ label: 'Method cards', slug: 'development/method-cards' },
 			],
 		},
 	],

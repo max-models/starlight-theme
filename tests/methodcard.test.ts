@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiLink, byModule, excluded, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
+import { apiLink, byModule, inlineHtml, excluded, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
 
 vi.mock('@astrojs/starlight', () => ({ default: (options: unknown) => ({ name: 'starlight', options }) }));
 vi.mock('starlight-pydocs', () => ({
@@ -106,6 +106,13 @@ describe('helpers', () => {
 		expect(excluded('pkg.a.f')).toBe(false);
 	});
 
+	it('renders a summary inline', () => {
+		const math = (tex: string) => `<m>${tex}</m>`;
+		expect(inlineHtml('The integral of ``f`` on `[a, b]`, $h = (b - a)/n$ & <more>', math)).toBe(
+			'The integral of <code>f</code> on <code>[a, b]</code>, <m>h = (b - a)/n</m> &amp; &lt;more&gt;'
+		);
+	});
+
 	it('groups the cards by module', () => {
 		const groups = byModule([card('pkg.z.g'), card('pkg.a.f'), card('pkg.z.a')] as any);
 		expect(groups.map(([module, cards]) => [module, cards.map((c) => c.name)])).toEqual([
@@ -168,6 +175,8 @@ describe('defineDocs({ methodcard })', () => {
 		expect(runner).toEqual({ command: [process.env.DOCS_PYTHON, '-m', 'griffe'] });
 		expect(sidebar.map((item) => item.label)).toEqual(['Guides', 'Numerics', 'API reference']);
 		expect(sidebar[1].link).toBe('/pkg/numerics/');
+		const links = build({ methodcard: true }).config.integrations[0].options.plugins.find((plugin: Any) => plugin.name === 'links').options;
+		expect(links.exclude).toEqual(expect.arrayContaining(['/pkg/numerics/', '/pkg/numerics/#*']));
 		const config = virtualConfig(integration);
 		expect(config.cards.map((c: Any) => c.name)).toEqual(['pkg.schemes.drift']);
 		expect(config).toMatchObject({

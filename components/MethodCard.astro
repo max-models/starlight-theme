@@ -6,7 +6,7 @@
 //     <MethodCard name="freeofcharge.deposition.deposit" />
 import katex from 'katex';
 import methodcards from 'virtual:starlight-theme/methodcards';
-import { apiLink, orderText, shortName, type MethodCardData } from '../lib/methodcard.ts';
+import { apiLink, inlineHtml, orderText, shortName, type MethodCardData } from '../lib/methodcard.ts';
 
 interface Props {
 	/** The qualified name of the method. */
@@ -23,7 +23,9 @@ if (!card) {
 	throw new Error(`<MethodCard name="${name}">: no such card in ${methodcards.package} (${methodcards.cards.map((c) => c.name).join(', ')})`);
 }
 const known = new Set(methodcards.cards.map((candidate) => candidate.name));
-const math = (tex: string) => katex.renderToString(tex, { displayMode: true, throwOnError: false, macros: { ...methodcards.macros } });
+const render = (tex: string, displayMode: boolean) => katex.renderToString(tex, { displayMode, throwOnError: false, macros: { ...methodcards.macros } });
+const math = (tex: string) => render(tex, true);
+const summary = inlineHtml(card.summary, (tex) => render(tex, false));
 const Heading = `h${headingLevel}` as 'h3';
 const order = orderText(card.order);
 const catalogue = `${methodcards.base}/numerics/`;
@@ -35,7 +37,7 @@ const catalogue = `${methodcards.base}/numerics/`;
 		<span class="method-card__kind">{card.kind}</span>
 		{card.lineno !== null && <a class="method-card__source" href={`${methodcards.source}${card.filepath}#L${card.lineno}`}>source</a>}
 	</header>
-	{card.summary && <p class="method-card__summary">{card.summary}</p>}
+	{card.summary && <p class="method-card__summary" set:html={summary} />}
 	<dl class="method-card__equations">
 		{
 			Object.entries(card.equations).map(([key, tex]) => (
@@ -117,6 +119,8 @@ const catalogue = `${methodcards.base}/numerics/`;
 	}
 	.method-card dd :global(.katex-display) {
 		margin: 0.25rem 0;
+	}
+	.method-card dd :global(.katex-display > .katex) {
 		text-align: start;
 	}
 	.method-card__facts dt {

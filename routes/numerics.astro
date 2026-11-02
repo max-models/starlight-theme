@@ -22,9 +22,7 @@ const description = `The numerical methods of ${methodcards.package}: the equati
 	{
 		groups.map(([module, cards]) => (
 			<>
-				<h2 id={module}>
-					<code>{module}</code>
-				</h2>
+				<h2 id={module}>{module}</h2>
 				{cards.map((card) => (
 					<MethodCard card={card} />
 				))}

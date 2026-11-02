@@ -198,7 +198,9 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	}
 	// DOCS_VALIDATE_LINKS=false for `astro dev`, where the check would run on every reload
 	if (process.env.DOCS_VALIDATE_LINKS !== 'false') {
-		plugins.push(starlightLinksValidator({ errorOnLocalLinks: false, exclude: [`${base}/api/**`, '/api/**'] }));
+		// the API pages and the method-card catalogue are injected routes, unknown to the check
+		const injected = methodcard ? [`${base}/numerics/`, `${base}/numerics/#*`] : [];
+		plugins.push(starlightLinksValidator({ errorOnLocalLinks: false, exclude: [`${base}/api/**`, '/api/**', ...injected] }));
 	}
 
 	const methodcardTitle = methodcard?.title ?? 'Numerics';
