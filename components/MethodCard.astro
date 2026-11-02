@@ -6,7 +6,7 @@
 //     <MethodCard name="freeofcharge.deposition.deposit" />
 import katex from 'katex';
 import methodcards from 'virtual:starlight-theme/methodcards';
-import { apiLink, inlineHtml, orderText, shortName, type MethodCardData } from '../lib/methodcard.ts';
+import { apiLink, cardLink, inlineHtml, orderText, shortName, type MethodCardData } from '../lib/methodcard.ts';
 
 interface Props {
 	/** The qualified name of the method. */
@@ -36,7 +36,6 @@ const inline = (text: string) => inlineHtml(text, (tex) => render(tex, false));
 const summary = inline(card.summary);
 const Heading = `h${headingLevel}` as 'h3';
 const order = orderText(card.order);
-const catalogue = `${methodcards.base}/numerics/`;
 ---
 
 <section class="method-card" id={card.name}>
@@ -67,7 +66,7 @@ const catalogue = `${methodcards.base}/numerics/`;
 					<dd>
 						<ul>
 							{card.components.map((part) => (
-								<li>{known.has(part) ? <a href={`${catalogue}#${part}`}><code>{shortName(part)}</code></a> : <code>{part}</code>}</li>
+								<li>{known.has(part) ? <a href={cardLink(methodcards, { name: part, module: methodcards.cards.find((c) => c.name === part)!.module })}><code>{shortName(part)}</code></a> : <code>{part}</code>}</li>
 							))}
 						</ul>
 					</dd>

@@ -371,6 +371,12 @@ export default defineDocs({ /* ... */ pythonPackage: 'freeofcharge', methodcard:
   `methodcard: { title: 'Methods' }`), each card with its equations in KaTeX (with the site's
   `math.macros`), a link to its API entry and to its source; `exclude: ['pkg.private.']` leaves
   methods (or whole modules, with a trailing dot) out;
+- `pages: true` adds one page per module, `<base>/numerics/<module>/` (`slowing_down` becomes
+  `slowing-down`), and turns the sidebar link into a "Numerics" group: the overview, then the
+  modules, titled by `labels: { 'pkg.chain': 'Injector chain' }` or after the module name;
+- `index: false` leaves the overview to the site: a hand-written
+  `src/content/docs/numerics/index.mdx` (text with `<MethodCard>`s where they belong), still
+  first in the sidebar group;
 - `<MethodCard name="freeofcharge.deposition.deposit" />`, from
   `@max-models/starlight-theme/components/MethodCard.astro`, puts one card into an MDX page.
 

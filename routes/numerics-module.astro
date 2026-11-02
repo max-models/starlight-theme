@@ -1,0 +1,32 @@
+---
+// `<base>/numerics/<module>/`: the method cards of one module. Added by
+// `defineDocs({ methodcard: { pages: true } })`; the cards come from `methodcard export`.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import methodcards from 'virtual:starlight-theme/methodcards';
+import MethodCard from '../components/MethodCard.astro';
+import { apiLink, shortName, type MethodcardModule } from '../lib/methodcard.ts';
+
+export function getStaticPaths() {
+	return methodcards.modules.map((module) => ({ params: { module: module.slug }, props: { module } }));
+}
+
+const { module } = Astro.props as { module: MethodcardModule };
+const cards = methodcards.cards.filter((card) => card.module === module.module).sort((a, b) => a.name.localeCompare(b.name));
+const api = apiLink(methodcards.base, methodcards.package, { name: module.module, module: module.module }).replace(/#.*$/, '');
+const description = `The numerical methods of ${module.module}: the equations each one implements, its assumptions and references.`;
+---
+
+<StarlightPage
+	frontmatter={{ title: module.label, description }}
+	headings={cards.map((card) => ({ depth: 2, slug: card.name, text: shortName(card.name) }))}
+>
+	<p>
+		The equations of <a href={api}><code>{module.module}</code></a>, declared on the code that implements them and checked by
+		the tests.
+	</p>
+	{
+		cards.map((card) => (
+			<MethodCard card={card} headingLevel={2} />
+		))
+	}
+</StarlightPage>
