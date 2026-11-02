@@ -22,7 +22,10 @@ export interface MethodcardOptions {
 	 * site: a hand-written `src/content/docs/numerics/index.mdx`. Default true.
 	 */
 	index?: boolean;
-	/** Sidebar and page titles of modules by qualified name, e.g. `{ 'pkg.chain': 'Injector chain' }`. */
+	/**
+	 * Sidebar and page titles of modules by qualified name, e.g. `{ 'pkg.chain': 'Injector chain' }`;
+	 * the modules listed come first, in this order, then the others by name.
+	 */
 	labels?: Record<string, string>;
 }
 
@@ -182,9 +185,13 @@ export function moduleLabel(module: string, labels: Record<string, string> = {})
 	return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The modules of the cards, sorted by name. */
+/** The modules of the cards: those in `labels` in its order, then the others by name. */
 export function cardModules(cards: MethodCardData[], labels: Record<string, string> = {}): MethodcardModule[] {
-	return byModule(cards).map(([module]) => ({ module, slug: moduleSlug(module), label: moduleLabel(module, labels) }));
+	const listed = Object.keys(labels);
+	const rank = (module: string) => (listed.includes(module) ? listed.indexOf(module) : listed.length);
+	return byModule(cards)
+		.map(([module]) => ({ module, slug: moduleSlug(module), label: moduleLabel(module, labels) }))
+		.sort((a, b) => rank(a.module) - rank(b.module));
 }
 
 /** Where a card is shown: its module page, else the overview, else its API entry. */

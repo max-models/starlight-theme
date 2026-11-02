@@ -135,6 +135,11 @@ describe('helpers', () => {
 		expect(moduleSlug('pkg')).toBe('pkg');
 		expect(moduleLabel('freeofcharge.slowing_down')).toBe('Slowing down');
 		expect(moduleLabel('freeofcharge.chain', { 'freeofcharge.chain': 'Injector chain' })).toBe('Injector chain');
+		expect(cardModules([card('pkg.b.f'), card('pkg.a.g'), card('pkg.c.h')] as any, { 'pkg.c': 'C', 'pkg.b': 'B' }).map((m) => m.module)).toEqual([
+			'pkg.c',
+			'pkg.b',
+			'pkg.a',
+		]);
 		expect(cardModules([card('pkg.b_c.f'), card('pkg.a.g')] as any, { 'pkg.a': 'First' })).toEqual([
 			{ module: 'pkg.a', slug: 'a', label: 'First' },
 			{ module: 'pkg.b_c', slug: 'b-c', label: 'B c' },

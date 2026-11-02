@@ -6,7 +6,7 @@ import methodcards from 'virtual:starlight-theme/methodcards';
 import MethodCard from '../components/MethodCard.astro';
 import { byModule, moduleLabel, moduleSlug } from '../lib/methodcard.ts';
 
-const groups = byModule(methodcards.cards);
+const groups = methodcards.modules.map((m) => [m.module, byModule(methodcards.cards).find(([module]) => module === m.module)?.[1] ?? []] as const);
 const label = (module: string) => methodcards.modules.find((m) => m.module === module)?.label ?? moduleLabel(module);
 const description = `The numerical methods of ${methodcards.package}: the equations each one implements, its order of accuracy, assumptions and references.`;
 ---
