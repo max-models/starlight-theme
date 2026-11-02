@@ -391,10 +391,15 @@ jobs:
         working-directory: ${{ inputs.project-dir }}/docs
         env:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
+          # The smoke paths describe the code being built. A build of another branch (the stable
+          # release next to a push or pull request from devel) predates pages added since, so it
+          # is only checked for its index.html.
+          CURRENT: ${{ !matrix.ref || matrix.ref == (github.head_ref || github.ref_name) }}
           # a user or organisation site (<owner>.github.io) is served at the root
           BASE: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && '/' || format('/{0}/', github.event.repository.name) }}${{ matrix.path }}
         run: |
           missing=0
+          if [ "$CURRENT" != true ]; then SMOKE_PATHS=""; fi
           for path in index.html $SMOKE_PATHS; do
             test -f "dist/$path" || { echo "missing dist/$path"; missing=1; }
           done
@@ -438,13 +443,18 @@ jobs:
           SMOKE_PATHS: ${{ inputs.smoke-paths }}
           STABLE: ${{ inputs.stable-branch }}
           DEPLOY: ${{ needs.plan.outputs.deploy }}
+          CURRENT_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           missing=0
           prefixes=""
           # the dev build exists only when deploying with a stable branch
           if [ "$DEPLOY" = true ] && [ -n "$STABLE" ]; then prefixes="dev/"; fi
           for prefix in "" $prefixes; do
-            for path in index.html $SMOKE_PATHS; do
+            # the root holds the stable branch when there is a dev build (or a pull request into
+            # it); from another branch it is the previous release, checked only for its index.html
+            paths=$SMOKE_PATHS
+            if [ -z "$prefix" ] && [ -d builds/site-stable ] && [ "$CURRENT_REF" != "$STABLE" ]; then paths=""; fi
+            for path in index.html $paths; do
               test -f "site/$prefix$path" || { echo "missing site/$prefix$path"; missing=1; }
             done
           done
