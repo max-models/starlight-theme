@@ -1,0 +1,52 @@
+---
+title: Method cards
+description: Show the equations of a package's numerical methods, declared once on the code.
+---
+
+import MethodCard from '@max-models/starlight-theme/components/MethodCard.astro';
+
+A numerical method declares its math (equations, order of accuracy, assumptions, references)
+on the code that implements it, with [methodcard](https://github.com/max-models/methodcard):
+
+```python
+from methodcard import NumericalMethod
+
+
+class Leapfrog(Scheme):
+    """Half a kick, a drift and half a kick: the velocity Verlet scheme."""
+
+    equations = {
+        "half_kick": r"v^{n+1/2} = v^n + \tfrac{1}{2} a(x^n)\,\Delta t",
+        "drift": r"x^{n+1} = x^n + v^{n+1/2}\,\Delta t",
+        "kick": r"v^{n+1} = v^{n+1/2} + \tfrac{1}{2} a(x^{n+1})\,\Delta t",
+    }
+    order = {"x": 2, "v": 2}
+    components = (Kick, Drift)
+```
+
+or, on a function, `@method(equations=..., order=...)`. With `methodcard: true` in
+`defineDocs`, the site shows them in three places:
+
+- the [Numerics](/starlight-theme/numerics/) page lists every card of the package, by module;
+- each method's API page, such as
+  [`Leapfrog`](/starlight-theme/api/example_pkg/schemes/#example_pkg.schemes.Leapfrog), has a
+  "Numerics" section;
+- an MDX page shows one card with `<MethodCard name="..." />`:
+
+```mdx
+import MethodCard from '@max-models/starlight-theme/components/MethodCard.astro';
+
+<MethodCard name="example_pkg.schemes.Leapfrog" />
+```
+
+<MethodCard name="example_pkg.schemes.Leapfrog" />
+
+The equations go through the site's KaTeX, with its `math.macros`; "Built from" links to the
+cards of the parts, the name to the API entry and "source" to the line that declares it.
+
+<MethodCard name="example_pkg.grid.midpoint_integral" />
+
+The cards are read from the source with griffe (`methodcard export example_pkg`), like the API
+reference, so building the docs imports nothing. The package's tests check the same cards:
+`TestMethodCards = method_suite("example_pkg")` compares each SymPy rule with the implementation,
+the observed with the declared order, and the cards of the docs with those of the code.

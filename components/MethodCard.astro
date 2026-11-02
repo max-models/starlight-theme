@@ -1,0 +1,146 @@
+---
+// One method card: its equations (KaTeX, with the site's macros), order, assumptions, references
+// and parts, linked to the method's API entry and source. Needs `defineDocs({ methodcard: true })`.
+//
+//     import MethodCard from '@max-models/starlight-theme/components/MethodCard.astro';
+//     <MethodCard name="freeofcharge.deposition.deposit" />
+import katex from 'katex';
+import methodcards from 'virtual:starlight-theme/methodcards';
+import { apiLink, inlineHtml, orderText, shortName, type MethodCardData } from '../lib/methodcard.ts';
+
+interface Props {
+	/** The qualified name of the method. */
+	name?: string;
+	/** The card itself (the catalogue passes it). */
+	card?: MethodCardData;
+	/** The heading level of the method's name. Default 3. */
+	headingLevel?: 2 | 3 | 4;
+}
+
+const { name, headingLevel = 3 } = Astro.props;
+const card = Astro.props.card ?? methodcards.cards.find((candidate) => candidate.name === name);
+if (!card) {
+	throw new Error(`<MethodCard name="${name}">: no such card in ${methodcards.package} (${methodcards.cards.map((c) => c.name).join(', ')})`);
+}
+const known = new Set(methodcards.cards.map((candidate) => candidate.name));
+// a LaTeX error fails the build, naming the card, rather than showing red text on the page
+const render = (tex: string, displayMode: boolean, where = 'text') => {
+	try {
+		return katex.renderToString(tex, { displayMode, throwOnError: true, macros: { ...methodcards.macros } });
+	} catch (error) {
+		throw new Error(`<MethodCard> ${card.name}, ${where}: ${(error as Error).message}`);
+	}
+};
+const math = (tex: string, key = 'equation') => render(tex, true, `equation ${key}`);
+const inline = (text: string) => inlineHtml(text, (tex) => render(tex, false));
+const summary = inline(card.summary);
+const Heading = `h${headingLevel}` as 'h3';
+const order = orderText(card.order);
+const catalogue = `${methodcards.base}/numerics/`;
+---
+
+<section class="method-card" id={card.name}>
+	<header>
+		<Heading class="method-card__name"><a href={apiLink(methodcards.base, methodcards.package, card)}><code>{shortName(card.name)}</code></a></Heading>
+		<span class="method-card__kind">{card.kind === 'attribute' ? 'property' : card.kind}</span>
+		{card.lineno !== null && <a class="method-card__source" href={`${methodcards.source}${card.filepath}#L${card.lineno}`}>source</a>}
+	</header>
+	{card.summary && <p class="method-card__summary" set:html={summary} />}
+	<dl class="method-card__equations">
+		{
+			Object.entries(card.equations).map(([key, tex]) => (
+				<>
+					<dt>{key.replaceAll('_', ' ')}</dt>
+					<dd set:html={math(tex, key)} />
+				</>
+			))
+		}
+	</dl>
+	<dl class="method-card__facts">
+		{order && (<><dt>Order</dt><dd>{order}</dd></>)}
+		{card.assumptions.length > 0 && (<><dt>Assumes</dt><dd><ul>{card.assumptions.map((item) => <li set:html={inline(item)} />)}</ul></dd></>)}
+		{card.references.length > 0 && (<><dt>References</dt><dd><ul>{card.references.map((item) => <li set:html={inline(item)} />)}</ul></dd></>)}
+		{
+			card.components.length > 0 && (
+				<>
+					<dt>Built from</dt>
+					<dd>
+						<ul>
+							{card.components.map((part) => (
+								<li>{known.has(part) ? <a href={`${catalogue}#${part}`}><code>{shortName(part)}</code></a> : <code>{part}</code>}</li>
+							))}
+						</ul>
+					</dd>
+				</>
+			)
+		}
+		{card.lean_theorems.length > 0 && (<><dt>Lean</dt><dd><ul>{card.lean_theorems.map((item) => <li><code>{item}</code></li>)}</ul></dd></>)}
+	</dl>
+</section>
+
+<style>
+	.method-card {
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		margin-block: 1.5rem;
+		background: var(--sl-color-bg-nav);
+	}
+	.method-card header {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	.method-card__name {
+		margin: 0;
+		font-size: var(--sl-text-h4);
+	}
+	.method-card__kind,
+	.method-card__source {
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-3);
+	}
+	.method-card__source {
+		margin-inline-start: auto;
+	}
+	.method-card__summary {
+		margin-block: 0.5rem 0;
+	}
+	.method-card dl {
+		display: grid;
+		grid-template-columns: max-content minmax(0, 1fr);
+		gap: 0.25rem 1rem;
+		margin-block: 0.75rem 0;
+		align-items: center;
+	}
+	.method-card dt {
+		font-size: var(--sl-text-sm);
+		color: var(--sl-color-gray-2);
+		font-style: italic;
+		margin: 0;
+	}
+	.method-card dd {
+		margin: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+	}
+	.method-card dd :global(.katex-display) {
+		margin: 0.25rem 0;
+	}
+	.method-card dd :global(.katex-display > .katex) {
+		text-align: start;
+	}
+	.method-card__facts dt {
+		font-style: normal;
+	}
+	.method-card ul {
+		margin: 0;
+		padding-inline-start: 1.1rem;
+	}
+	@media (max-width: 40rem) {
+		.method-card dl {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>
