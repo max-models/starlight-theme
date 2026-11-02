@@ -80,7 +80,8 @@ describe('defineDocs', () => {
 
 	it('appends the API reference unless the sidebar places it', () => {
 		const withPackage = build({ pythonPackage: 'simgeometry' });
-		expect(withPackage.starlight.sidebar.at(-1)).toEqual({ label: 'API reference', items: ['PYDOCS'] });
+		expect(withPackage.starlight.sidebar.at(-1)).toEqual({ label: 'API reference', collapsed: true, items: ['PYDOCS'] });
+		expect(withPackage.pydocs.packages[0].sidebar).toEqual({ collapsed: true });
 		expect(withPackage.pydocs.packages[0]).toMatchObject({ name: 'simgeometry', search: ['../src'] });
 
 		const placed = build({ pythonPackage: 'simgeometry', sidebar: [{ label: 'Reference', items: [{ label: 'API', items: ['PYDOCS'] }] }] });
