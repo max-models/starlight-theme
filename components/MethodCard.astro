@@ -23,8 +23,15 @@ if (!card) {
 	throw new Error(`<MethodCard name="${name}">: no such card in ${methodcards.package} (${methodcards.cards.map((c) => c.name).join(', ')})`);
 }
 const known = new Set(methodcards.cards.map((candidate) => candidate.name));
-const render = (tex: string, displayMode: boolean) => katex.renderToString(tex, { displayMode, throwOnError: false, macros: { ...methodcards.macros } });
-const math = (tex: string) => render(tex, true);
+// a LaTeX error fails the build, naming the card, rather than showing red text on the page
+const render = (tex: string, displayMode: boolean, where = 'text') => {
+	try {
+		return katex.renderToString(tex, { displayMode, throwOnError: true, macros: { ...methodcards.macros } });
+	} catch (error) {
+		throw new Error(`<MethodCard> ${card.name}, ${where}: ${(error as Error).message}`);
+	}
+};
+const math = (tex: string, key = 'equation') => render(tex, true, `equation ${key}`);
 const inline = (text: string) => inlineHtml(text, (tex) => render(tex, false));
 const summary = inline(card.summary);
 const Heading = `h${headingLevel}` as 'h3';
@@ -44,7 +51,7 @@ const catalogue = `${methodcards.base}/numerics/`;
 			Object.entries(card.equations).map(([key, tex]) => (
 				<>
 					<dt>{key.replaceAll('_', ' ')}</dt>
-					<dd set:html={math(tex)} />
+					<dd set:html={math(tex, key)} />
 				</>
 			))
 		}
