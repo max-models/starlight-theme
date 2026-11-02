@@ -168,7 +168,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						search: ['../src'],
 						docstringStyle: 'google',
 						sourceLink: { host: 'github', repo: `${owner}/${options.repo}`, ref: sourceBranch, root: '..' },
-						sidebar: { collapsed: false },
+						sidebar: { collapsed: true },
 						...options.pydocs,
 						// methodcard's griffe extension adds the "Numerics" sections, after the site's own
 						...(methodcard
@@ -207,7 +207,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	const withNumerics: Sidebar = methodcard ? [...options.sidebar, { label: methodcardTitle, link: `${base}/numerics/` }] : options.sidebar;
 	const sidebar: Sidebar =
 		pkg && !containsPlaceholder(options.sidebar)
-			? [...withNumerics, { label: 'API reference', items: [pydocsSidebarGroup] }]
+			? [...withNumerics, { label: 'API reference', collapsed: true, items: [pydocsSidebarGroup] }]
 			: withNumerics;
 	const integrations = [...(options.astro?.integrations ?? [])];
 	if (methodcard && pkg) {
