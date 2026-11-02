@@ -1,0 +1,32 @@
+---
+// `<base>/numerics/`: every method card of the project, by module. Added by
+// `defineDocs({ methodcard: true })`; the cards come from `methodcard export`.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import methodcards from 'virtual:starlight-theme/methodcards';
+import MethodCard from '../components/MethodCard.astro';
+import { byModule } from '../lib/methodcard.ts';
+
+const groups = byModule(methodcards.cards);
+const description = `The numerical methods of ${methodcards.package}: the equations each one implements, its order of accuracy, assumptions and references.`;
+---
+
+<StarlightPage
+	frontmatter={{ title: methodcards.title, description }}
+	headings={groups.map(([module]) => ({ depth: 2, slug: module, text: module }))}
+>
+	<p>
+		{description} Each card is declared on the code that implements it, checked by the tests, and also shown on the method's
+		API page.
+	</p>
+	{groups.length === 0 && <p>No method has a card yet.</p>}
+	{
+		groups.map(([module, cards]) => (
+			<>
+				<h2 id={module}>{module}</h2>
+				{cards.map((card) => (
+					<MethodCard card={card} />
+				))}
+			</>
+		))
+	}
+</StarlightPage>

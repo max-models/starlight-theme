@@ -10,7 +10,7 @@ when it bumps its version.
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
 | `theme()` Starlight plugin | The palette, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the link cards of a home page; `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the link cards of a home page; `MethodCard`: one method card (see [Method cards](#method-cards)); `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
@@ -94,6 +94,7 @@ Other options:
 | `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page |
 | `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; without one the title has the max-models wave before it, `false` for neither. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
 | `release` | The badge of the latest release in the hero: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
+| `methodcard` | `true` or `{ title, exclude }`: the [method cards](#method-cards) of the package, on its API pages and a catalogue page |
 | `shareImage` | `false` for no share image (`<base>/og.png`, the header picture with the title and description, for link previews) |
 
 and `starlight` / `astro` for anything else, merged over the result, e.g.
@@ -352,6 +353,29 @@ docs-build:  ## the static site in docs/dist, as in CI
 	$(NOTEBOOKS) convert
 	cd docs && npx starlight-check-mdx && $(DOCS_ENV) npx astro build
 ```
+
+### Method cards
+
+A package whose numerical methods carry [method cards](https://github.com/max-models/methodcard)
+(equations, order of accuracy, assumptions, references, declared with methodcard's `NumericalMethod`
+mixin or `@method` decorator) shows them with
+
+```js
+export default defineDocs({ /* ... */ pythonPackage: 'freeofcharge', methodcard: true });
+```
+
+- each method's API page gets a "Numerics" section: methodcard's griffe extension, added to the
+  starlight-pydocs entry (griffe then runs in the project's Python, `DOCS_PYTHON` or the nearest
+  `.venv`, which has methodcard, rather than in `uvx`);
+- `<base>/numerics/` lists every card by module, linked from the sidebar ("Numerics", or
+  `methodcard: { title: 'Methods' }`), each card with its equations in KaTeX (with the site's
+  `math.macros`), a link to its API entry and to its source; `exclude: ['pkg.private.']` leaves
+  methods (or whole modules, with a trailing dot) out;
+- `<MethodCard name="freeofcharge.deposition.deposit" />`, from
+  `@max-models/starlight-theme/components/MethodCard.astro`, puts one card into an MDX page.
+
+The cards come from `methodcard export <package>`, run once when the config loads; it reads the
+source with griffe, like the API reference, so nothing is imported.
 
 ### CI
 

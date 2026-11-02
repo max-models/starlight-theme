@@ -35,11 +35,14 @@ export default defineDocs({
 			items: [
 				{ label: 'Building the docs', slug: 'development/docs' },
 				{ label: 'Writing gallery examples', slug: 'development/gallery' },
+				{ label: 'Method cards', slug: 'development/method-cards' },
 			],
 		},
 	],
 	// run the tutorials in Colab or Binder from their pages
 	launch: ['colab', 'binder'],
+	// the method cards of example_pkg: a Numerics section on their API pages and /numerics/
+	methodcard: true,
 	// \vect{E} in every page's math
 	math: { macros: { '\\vect': '\\boldsymbol{#1}' } },
 	astro: {
