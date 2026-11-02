@@ -10,7 +10,7 @@
 //
 // DOCS_CHANNEL=stable|dev (set by the docs workflow when it builds both) serves the dev build at
 // <repo>/dev/ and adds a stable/dev switch; the stable build links its sources to DOCS_STABLE_BRANCH.
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import type { StarlightUserConfig } from '@astrojs/starlight/types';
@@ -20,6 +20,7 @@ import remarkMath from 'remark-math';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightPydocs, { pydocsSidebarGroup, type PydocsPackageInput, type PydocsUserConfig } from 'starlight-pydocs';
 import { readCitation, readLicense } from './citation.ts';
+import { excluded, exportCards, findPython, gitRoot, methodcardIntegration, type MethodcardOptions } from './methodcard.ts';
 import theme, { type LaunchService, type NavLink, type Versions } from './plugin.ts';
 import { dependencyProjects, inventoryUrl, projects as defaultProjects, type Project } from './projects.ts';
 import { rehypeRebase } from './rebase.ts';
@@ -47,6 +48,12 @@ export interface DocsOptions {
 	pythonPackage?: string;
 	/** Overrides for that package's starlight-pydocs entry (search paths, members, ...). */
 	pydocs?: Partial<PydocsPackageInput>;
+	/**
+	 * Method cards (the methodcard package): a "Numerics" section on each method's API page (the
+	 * griffe extension) and a catalogue page at `<base>/numerics/`, linked from the sidebar. Needs
+	 * `pythonPackage` and methodcard installed in the project's Python.
+	 */
+	methodcard?: boolean | MethodcardOptions;
 	/** Sphinx inventories for cross-references. Default Python and NumPy. */
 	inventories?: PydocsUserConfig['inventories'];
 	/**
@@ -128,6 +135,8 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	const pkg = options.pythonPackage;
 	const pyproject = resolve(options.pyproject ?? '../pyproject.toml');
 	const root = dirname(pyproject);
+	const methodcard = options.methodcard ? (options.methodcard === true ? {} : options.methodcard) : undefined;
+	if (methodcard && !pkg) throw new Error('methodcard needs pythonPackage');
 
 	const plugins: NonNullable<StarlightUserConfig['plugins']> = [
 		theme({
@@ -161,6 +170,13 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						sourceLink: { host: 'github', repo: `${owner}/${options.repo}`, ref: sourceBranch, root: '..' },
 						sidebar: { collapsed: false },
 						...options.pydocs,
+						// methodcard's griffe extension adds the "Numerics" sections, after the site's own
+						...(methodcard
+							? {
+									extensions: [...(options.pydocs?.extensions ?? []), 'methodcard.griffe_extension'],
+									extraRequirements: [...(options.pydocs?.extraRequirements ?? []), 'methodcard'],
+								}
+							: {}),
 						// a site's own excludes add to the tests, rather than replace them
 						members: {
 							...options.pydocs?.members,
@@ -168,8 +184,14 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						},
 					},
 				],
-				// The interpreter griffe runs in (set by `make docs-*`); falls back to uvx / python.
-				runner: process.env.DOCS_PYTHON ? { python: process.env.DOCS_PYTHON } : undefined,
+				// The interpreter griffe runs in (set by `make docs-*`); falls back to uvx / python. With method
+				// cards, griffe runs in the project's Python, which has methodcard (and griffe, its dependency):
+				// pydocs would otherwise prefer uvx, with methodcard from PyPI in whatever version.
+				runner: methodcard
+					? { command: [findPython(), '-m', 'griffe'] }
+					: process.env.DOCS_PYTHON
+						? { python: process.env.DOCS_PYTHON }
+						: undefined,
 				inventories,
 			})
 		);
@@ -179,10 +201,26 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 		plugins.push(starlightLinksValidator({ errorOnLocalLinks: false, exclude: [`${base}/api/**`, '/api/**'] }));
 	}
 
+	const methodcardTitle = methodcard?.title ?? 'Numerics';
+	const withNumerics: Sidebar = methodcard ? [...options.sidebar, { label: methodcardTitle, link: `${base}/numerics/` }] : options.sidebar;
 	const sidebar: Sidebar =
 		pkg && !containsPlaceholder(options.sidebar)
-			? [...options.sidebar, { label: 'API reference', items: [pydocsSidebarGroup] }]
-			: options.sidebar;
+			? [...withNumerics, { label: 'API reference', items: [pydocsSidebarGroup] }]
+			: withNumerics;
+	const integrations = [...(options.astro?.integrations ?? [])];
+	if (methodcard && pkg) {
+		const search = options.pydocs?.search?.[0] ?? '../src';
+		integrations.unshift(
+			methodcardIntegration({
+				title: methodcardTitle,
+				package: pkg,
+				cards: exportCards(pkg, search).filter((card) => !excluded(card.name, methodcard.exclude)),
+				macros: options.math?.macros ?? {},
+				base,
+				source: `${github}/blob/${sourceBranch}/${relative(gitRoot(root), resolve(search)).split(sep).join('/')}/`,
+			})
+		);
+	}
 
 	const { plugins: extraPlugins = [], ...starlightOverrides } = options.starlight ?? {};
 
@@ -223,7 +261,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 				...starlightOverrides,
 				plugins: [...plugins, ...extraPlugins],
 			}),
-			...(options.astro?.integrations ?? []),
+			...integrations,
 		],
 	};
 }
