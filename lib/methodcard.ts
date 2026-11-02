@@ -24,7 +24,8 @@ export interface MethodCardData {
 	references: string[];
 	lean_theorems: string[];
 	components: string[];
-	kind: 'class' | 'function';
+	/** "attribute" for a property. */
+	kind: 'class' | 'function' | 'attribute';
 	module: string;
 	filepath: string;
 	lineno: number | null;
@@ -114,13 +115,15 @@ const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;'
 const escapeHtml = (text: string) => text.replace(/[&<>"]/g, (char) => ESCAPES[char]);
 
 /**
- * A docstring summary as inline HTML: ``code`` and `code` as code, $math$ through `math`
- * (inline KaTeX), the rest escaped.
+ * A docstring summary or a reference as inline HTML: ``code`` and `code` as code, $math$
+ * through `math` (inline KaTeX), [text](https://...) as a link, the rest escaped.
  */
 export function inlineHtml(text: string, math: (tex: string) => string): string {
 	return text
-		.split(/(``[^`]+``|`[^`]+`|\$[^$]+\$)/)
+		.split(/(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|``[^`]+``|`[^`]+`|\$[^$]+\$)/)
 		.map((part) => {
+			const link = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(part);
+			if (link) return `<a href="${escapeHtml(link[2])}">${inlineHtml(link[1], math)}</a>`;
 			if (/^``[^`]+``$/.test(part)) return `<code>${escapeHtml(part.slice(2, -2))}</code>`;
 			if (/^`[^`]+`$/.test(part)) return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
 			if (/^\$[^$]+\$$/.test(part)) return math(part.slice(1, -1));

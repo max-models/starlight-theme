@@ -113,6 +113,14 @@ describe('helpers', () => {
 		);
 	});
 
+	it('renders links in references', () => {
+		const math = (tex: string) => `<m>${tex}</m>`;
+		expect(inlineHtml('[Stix, Plasma Phys. $14$](https://doi.org/10.1088/x) and `code`', math)).toBe(
+			'<a href="https://doi.org/10.1088/x">Stix, Plasma Phys. <m>14</m></a> and <code>code</code>'
+		);
+		expect(inlineHtml('[not a link](javascript:alert(1))', math)).toBe('[not a link](javascript:alert(1))');
+	});
+
 	it('groups the cards by module', () => {
 		const groups = byModule([card('pkg.z.g'), card('pkg.a.f'), card('pkg.z.a')] as any);
 		expect(groups.map(([module, cards]) => [module, cards.map((c) => c.name)])).toEqual([

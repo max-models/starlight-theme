@@ -35,7 +35,7 @@ const catalogue = `${methodcards.base}/numerics/`;
 <section class="method-card" id={card.name}>
 	<header>
 		<Heading class="method-card__name"><a href={apiLink(methodcards.base, methodcards.package, card)}><code>{shortName(card.name)}</code></a></Heading>
-		<span class="method-card__kind">{card.kind}</span>
+		<span class="method-card__kind">{card.kind === 'attribute' ? 'property' : card.kind}</span>
 		{card.lineno !== null && <a class="method-card__source" href={`${methodcards.source}${card.filepath}#L${card.lineno}`}>source</a>}
 	</header>
 	{card.summary && <p class="method-card__summary" set:html={summary} />}
