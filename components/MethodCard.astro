@@ -25,7 +25,8 @@ if (!card) {
 const known = new Set(methodcards.cards.map((candidate) => candidate.name));
 const render = (tex: string, displayMode: boolean) => katex.renderToString(tex, { displayMode, throwOnError: false, macros: { ...methodcards.macros } });
 const math = (tex: string) => render(tex, true);
-const summary = inlineHtml(card.summary, (tex) => render(tex, false));
+const inline = (text: string) => inlineHtml(text, (tex) => render(tex, false));
+const summary = inline(card.summary);
 const Heading = `h${headingLevel}` as 'h3';
 const order = orderText(card.order);
 const catalogue = `${methodcards.base}/numerics/`;
@@ -50,8 +51,8 @@ const catalogue = `${methodcards.base}/numerics/`;
 	</dl>
 	<dl class="method-card__facts">
 		{order && (<><dt>Order</dt><dd>{order}</dd></>)}
-		{card.assumptions.length > 0 && (<><dt>Assumes</dt><dd><ul>{card.assumptions.map((item) => <li>{item}</li>)}</ul></dd></>)}
-		{card.references.length > 0 && (<><dt>References</dt><dd><ul>{card.references.map((item) => <li>{item}</li>)}</ul></dd></>)}
+		{card.assumptions.length > 0 && (<><dt>Assumes</dt><dd><ul>{card.assumptions.map((item) => <li set:html={inline(item)} />)}</ul></dd></>)}
+		{card.references.length > 0 && (<><dt>References</dt><dd><ul>{card.references.map((item) => <li set:html={inline(item)} />)}</ul></dd></>)}
 		{
 			card.components.length > 0 && (
 				<>
