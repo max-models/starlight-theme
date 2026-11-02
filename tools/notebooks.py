@@ -35,8 +35,10 @@ Cell tags: ``remove-cell``, ``hide-input``, ``fold-input`` (code in a closed <de
 ``fold-output`` (the outputs in a closed <details>, titled by the cell metadata ``fold_summary``,
 default "Show output"), ``remove-output``, ``raises-exception``, ``notebook-grid`` (see
 ``grid``), and nbclient's ``skip-execution`` (shown, not run). Notebook metadata ``docs_order``
-sets the sidebar order (else ``index`` first, then by file name), and ``docs_launch: false`` hides
-the site's Colab/Binder buttons (as do ``mpiRanks`` > 1).
+sets the sidebar order (else ``index`` first, then by file name), ``docs_launch: false`` hides
+the site's Colab/Binder buttons (as do ``mpiRanks`` > 1), and ``docs_timeout`` sets the seconds per
+cell of that notebook (default ``--timeout``, 600), e.g. for a first cell that installs and
+compiles a Julia package.
 
 Outputs: images become files next to the page (NotebookImage), HTML and SVG are inlined (RawHtml).
 An output whose metadata has a ``"pyvista-scene"`` dict (optional ``alt`` and ``title``) is a 3-D
@@ -231,7 +233,7 @@ def execute_notebook(path: Path, target: Path, timeout: int, nranks: int) -> Non
     nb = nbformat.read(path, as_version=4)
     client = NotebookClient(
         nb,
-        timeout=timeout,
+        timeout=int(nb.metadata.get("docs_timeout", timeout)),
         km=_kernel_manager(nranks),
         resources={"metadata": {"path": str(path.parent)}},
     )
