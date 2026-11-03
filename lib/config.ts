@@ -20,7 +20,17 @@ import remarkMath from 'remark-math';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightPydocs, { pydocsSidebarGroup, type PydocsPackageInput, type PydocsUserConfig } from 'starlight-pydocs';
 import { readCitation, readLicense } from './citation.ts';
-import { excluded, exportCards, findPython, gitRoot, methodcardIntegration, type MethodcardOptions } from './methodcard.ts';
+import {
+	cardModules,
+	excluded,
+	exportCards,
+	findPython,
+	gitRoot,
+	methodcardIntegration,
+	numericsSidebar,
+	type MethodcardConfig,
+	type MethodcardOptions,
+} from './methodcard.ts';
 import theme, { type LaunchService, type NavLink, type Versions } from './plugin.ts';
 import { dependencyProjects, inventoryUrl, projects as defaultProjects, type Project } from './projects.ts';
 import { rehypeRebase } from './rebase.ts';
@@ -50,8 +60,9 @@ export interface DocsOptions {
 	pydocs?: Partial<PydocsPackageInput>;
 	/**
 	 * Method cards (the methodcard package): a "Numerics" section on each method's API page (the
-	 * griffe extension) and a catalogue page at `<base>/numerics/`, linked from the sidebar. Needs
-	 * `pythonPackage` and methodcard installed in the project's Python.
+	 * griffe extension) and a catalogue page at `<base>/numerics/`, linked from the sidebar; with
+	 * `pages`, one page per module and a sidebar group. Needs `pythonPackage` and methodcard
+	 * installed in the project's Python.
 	 */
 	methodcard?: boolean | MethodcardOptions;
 	/** Sphinx inventories for cross-references. Default Python and NumPy. */
@@ -199,30 +210,33 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	// DOCS_VALIDATE_LINKS=false for `astro dev`, where the check would run on every reload
 	if (process.env.DOCS_VALIDATE_LINKS !== 'false') {
 		// the API pages and the method-card catalogue are injected routes, unknown to the check
-		const injected = methodcard ? [`${base}/numerics/`, `${base}/numerics/#*`] : [];
+		const injected = methodcard ? [`${base}/numerics/`, `${base}/numerics/#*`, `${base}/numerics/**`] : [];
 		plugins.push(starlightLinksValidator({ errorOnLocalLinks: false, exclude: [`${base}/api/**`, '/api/**', ...injected] }));
 	}
 
-	const methodcardTitle = methodcard?.title ?? 'Numerics';
-	const withNumerics: Sidebar = methodcard ? [...options.sidebar, { label: methodcardTitle, link: `${base}/numerics/` }] : options.sidebar;
+	let numerics: MethodcardConfig | undefined;
+	if (methodcard && pkg) {
+		const search = options.pydocs?.search?.[0] ?? '../src';
+		const cards = exportCards(pkg, search).filter((card) => !excluded(card.name, methodcard.exclude));
+		numerics = {
+			title: methodcard.title ?? 'Numerics',
+			package: pkg,
+			cards,
+			macros: options.math?.macros ?? {},
+			base,
+			source: `${github}/blob/${sourceBranch}/${relative(gitRoot(root), resolve(search)).split(sep).join('/')}/`,
+			pages: methodcard.pages ?? false,
+			index: methodcard.index ?? true,
+			modules: cardModules(cards, methodcard.labels),
+		};
+	}
+	const withNumerics: Sidebar = numerics ? [...options.sidebar, ...numericsSidebar(numerics)] : options.sidebar;
 	const sidebar: Sidebar =
 		pkg && !containsPlaceholder(options.sidebar)
 			? [...withNumerics, { label: 'API reference', collapsed: true, items: [pydocsSidebarGroup] }]
 			: withNumerics;
 	const integrations = [...(options.astro?.integrations ?? [])];
-	if (methodcard && pkg) {
-		const search = options.pydocs?.search?.[0] ?? '../src';
-		integrations.unshift(
-			methodcardIntegration({
-				title: methodcardTitle,
-				package: pkg,
-				cards: exportCards(pkg, search).filter((card) => !excluded(card.name, methodcard.exclude)),
-				macros: options.math?.macros ?? {},
-				base,
-				source: `${github}/blob/${sourceBranch}/${relative(gitRoot(root), resolve(search)).split(sep).join('/')}/`,
-			})
-		);
-	}
+	if (numerics) integrations.unshift(methodcardIntegration(numerics));
 
 	const { plugins: extraPlugins = [], ...starlightOverrides } = options.starlight ?? {};
 
