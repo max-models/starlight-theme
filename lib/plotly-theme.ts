@@ -112,6 +112,8 @@ export function themeControls(layout: Record<string, any>, colors: ControlColors
 	const out = { ...layout };
 	if (Array.isArray(layout.updatemenus)) {
 		out.updatemenus = layout.updatemenus.map((menu: Record<string, any>) => ({
+			// Plotly draws the active button in a fixed light blue: off for buttons (Play, Pause)
+			...(menu.type === 'buttons' && menu.showactive === undefined ? { showactive: false } : {}),
 			...menu,
 			bgcolor: colors.background,
 			bordercolor: colors.border,

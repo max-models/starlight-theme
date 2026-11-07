@@ -88,6 +88,9 @@ describe('themeControls', () => {
 		expect(out.title).toBe('movie');
 		expect(out.updatemenus[0]).toMatchObject({ bgcolor: '#123', bordercolor: '#456', font: { size: 12, color: '#eee' } });
 		expect(out.updatemenus[0].buttons).toEqual([{ label: 'Play' }]);
+		expect(out.updatemenus[0].showactive).toBe(false); // no fixed light blue on the active button
+		expect(themeControls({ updatemenus: [{ type: 'buttons', showactive: true }] }, colors).updatemenus[0].showactive).toBe(true);
+		expect(themeControls({ updatemenus: [{ type: 'dropdown' }] }, colors).updatemenus[0]).not.toHaveProperty('showactive');
 		expect(out.sliders[0]).toMatchObject({ bgcolor: '#123', activebgcolor: '#0ff', tickcolor: '#456', font: { color: '#eee' } });
 		expect(out.sliders[0].currentvalue).toEqual({ prefix: 't = ', font: { color: '#eee' } });
 		expect(layout.sliders[0]).not.toHaveProperty('bgcolor'); // the input is unchanged
