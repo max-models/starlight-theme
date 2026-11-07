@@ -195,7 +195,9 @@ export function compactFigure(figure: Figure): Figure {
 		out[key] = axis;
 	}
 	if (layout.showlegend !== false) {
-		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom' };
+		// at the top of the figure: hung from the plot's top edge (y > 1), Plotly draws a horizontal
+		// legend about 15 px too low, over the plot
+		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1, yanchor: 'top', yref: 'container' };
 	}
 	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
 	if (title) out.title = { text: '' }; // shown above the figure, see movableTitle

@@ -119,7 +119,7 @@ describe('compactFigure', () => {
 	it('puts the legend above the plot and shrinks margins, font and colorbars', () => {
 		const out = compactFigure(figure);
 		const layout = out.layout!;
-		expect(layout.legend).toEqual({ x: 0, y: 1.02, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'bottom' });
+		expect(layout.legend).toEqual({ x: 0, y: 1, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'top', yref: 'container' });
 		expect(layout.margin).toEqual({ l: 56, r: 12, t: 16, b: 64, pad: 0 });
 		expect(layout.title).toEqual({ text: '' }); // shown above the figure instead
 		expect(layout.font.size).toBe(12);
