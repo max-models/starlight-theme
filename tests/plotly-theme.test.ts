@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { colorSlot, isBlack, paletteFigure, recolorTrace, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { colorSlot, isBlack, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -72,5 +72,31 @@ describe('paletteFigure', () => {
 		const figure = { data: [{ meta: { color_slot: 0 }, line: { color: '#1f77b4' } }], layout: {} };
 		expect(paletteFigure(figure, []).layout).toEqual({});
 		expect(paletteFigure(figure, []).data![0].line.color).toBe('#1f77b4');
+	});
+});
+
+describe('themeControls', () => {
+	const colors = { text: '#eee', background: '#123', border: '#456', active: '#0ff' };
+
+	it('gives buttons and sliders the page colours and keeps the rest', () => {
+		const layout = {
+			title: 'movie',
+			updatemenus: [{ type: 'buttons', font: { size: 12 }, buttons: [{ label: 'Play' }] }],
+			sliders: [{ steps: [{ label: '0' }], currentvalue: { prefix: 't = ' } }],
+		};
+		const out = themeControls(layout, colors);
+		expect(out.title).toBe('movie');
+		expect(out.updatemenus[0]).toMatchObject({ bgcolor: '#123', bordercolor: '#456', font: { size: 12, color: '#eee' } });
+		expect(out.updatemenus[0].buttons).toEqual([{ label: 'Play' }]);
+		expect(out.updatemenus[0].showactive).toBe(false); // no fixed light blue on the active button
+		expect(themeControls({ updatemenus: [{ type: 'buttons', showactive: true }] }, colors).updatemenus[0].showactive).toBe(true);
+		expect(themeControls({ updatemenus: [{ type: 'dropdown' }] }, colors).updatemenus[0]).not.toHaveProperty('showactive');
+		expect(out.sliders[0]).toMatchObject({ bgcolor: '#123', activebgcolor: '#0ff', tickcolor: '#456', font: { color: '#eee' } });
+		expect(out.sliders[0].currentvalue).toEqual({ prefix: 't = ', font: { color: '#eee' } });
+		expect(layout.sliders[0]).not.toHaveProperty('bgcolor'); // the input is unchanged
+	});
+
+	it('leaves a layout without controls alone', () => {
+		expect(themeControls({ xaxis: {} }, colors)).toEqual({ xaxis: {} });
 	});
 });

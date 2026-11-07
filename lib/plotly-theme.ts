@@ -91,3 +91,45 @@ export function paletteFigure(figure: Figure, palette: string[], ink?: string): 
 	if (palette.length) out.layout = { ...(figure.layout ?? {}), colorway: palette };
 	return out;
 }
+
+/** The colours of the page that a figure's controls take. */
+export interface ControlColors {
+	/** The text, also of the button labels and the slider's ticks. */
+	text: string;
+	/** The background of the buttons and the slider's rail. */
+	background: string;
+	/** The borders of the buttons and the slider. */
+	border: string;
+	/** The slider's handle while dragged. */
+	active: string;
+}
+
+/**
+ * The layout's buttons (`updatemenus`) and sliders in the page's colours: without a template,
+ * Plotly draws them white with light text, which cannot be read in dark mode.
+ */
+export function themeControls(layout: Record<string, any>, colors: ControlColors): Record<string, any> {
+	const out = { ...layout };
+	if (Array.isArray(layout.updatemenus)) {
+		out.updatemenus = layout.updatemenus.map((menu: Record<string, any>) => ({
+			// Plotly draws the active button in a fixed light blue: off for buttons (Play, Pause)
+			...(menu.type === 'buttons' && menu.showactive === undefined ? { showactive: false } : {}),
+			...menu,
+			bgcolor: colors.background,
+			bordercolor: colors.border,
+			font: { ...menu.font, color: colors.text },
+		}));
+	}
+	if (Array.isArray(layout.sliders)) {
+		out.sliders = layout.sliders.map((slider: Record<string, any>) => ({
+			...slider,
+			bgcolor: colors.background,
+			bordercolor: colors.border,
+			activebgcolor: colors.active,
+			tickcolor: colors.border,
+			font: { ...slider.font, color: colors.text },
+			currentvalue: { ...slider.currentvalue, font: { ...slider.currentvalue?.font, color: colors.text } },
+		}));
+	}
+	return out;
+}
