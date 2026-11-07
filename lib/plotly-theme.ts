@@ -182,8 +182,7 @@ export function compactFigure(figure: Figure): Figure {
 		r: cap(margin.r, 12),
 		// the buttons (above the plot) and the slider (below it) of an animation sit in the
 		// margins, and Plotly does not make room for a slider: 150 px fit it with its labels
-		// a legend at the top lies below this margin: there it is the space above the legend
-		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) && !title ? 44 : layout.showlegend === false ? 16 : 4),
+		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) && !title ? 44 : 16),
 		b: controls ? Math.max(typeof margin.b === 'number' ? margin.b : 0, 150) + (moved ? 50 : 0) : cap(margin.b, titled('x') ? 64 : 16),
 		pad: 0,
 	};

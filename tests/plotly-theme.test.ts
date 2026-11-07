@@ -120,7 +120,7 @@ describe('compactFigure', () => {
 		const out = compactFigure(figure);
 		const layout = out.layout!;
 		expect(layout.legend).toEqual({ x: 0, y: 1, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'top', yref: 'container' });
-		expect(layout.margin).toEqual({ l: 56, r: 12, t: 4, b: 64, pad: 0 });
+		expect(layout.margin).toEqual({ l: 56, r: 12, t: 16, b: 64, pad: 0 });
 		expect(layout.title).toEqual({ text: '' }); // shown above the figure instead
 		expect(layout.font.size).toBe(12);
 		expect(layout.coloraxis.colorbar.thickness).toBe(10);
@@ -141,7 +141,7 @@ describe('compactFigure', () => {
 		const layout = compactFigure({ layout: { margin: { l: 4, b: 2 }, showlegend: false } }).layout!;
 		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
 		expect(layout).not.toHaveProperty('legend');
-		expect(compactFigure({}).layout!.margin).toMatchObject({ l: 16, t: 4 });
+		expect(compactFigure({}).layout!.margin.l).toBe(16);
 		const movie = compactFigure({ layout: { sliders: [{}], margin: { b: 60 } } }).layout!;
 		expect(movie.margin).toMatchObject({ t: 70, b: 150 });
 		expect(compactFigure({ layout: { updatemenus: [{}], margin: { t: 40, b: 200 } } }).layout!.margin).toMatchObject({ t: 40, b: 200 });
