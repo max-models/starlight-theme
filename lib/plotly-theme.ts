@@ -167,6 +167,14 @@ export function compactFigure(figure: Figure): Figure {
 	const titled = (prefix: string) => axes.some((key) => key.startsWith(prefix) && titleText(layout[key]?.title));
 	const margin = layout.margin ?? {};
 	const controls = hasControls(figure);
+	const title = movableTitle(figure);
+	// buttons in the slider's row (Play and Pause beside it) cover its start on a narrow screen:
+	// the slider moves to a row of its own below them
+	const menus: Record<string, any>[] = Array.isArray(layout.updatemenus) ? layout.updatemenus : [];
+	const besideButtons = (slider: Record<string, any>) =>
+		menus.some((menu) => Math.abs((menu.y ?? 1) - (slider.y ?? 0)) < 0.05 && (menu.x ?? -0.05) <= (slider.x ?? 0));
+	const sliders: Record<string, any>[] = Array.isArray(layout.sliders) ? layout.sliders : [];
+	const moved = sliders.some(besideButtons);
 	const cap = (value: unknown, max: number) => Math.min(typeof value === 'number' ? value : max, max);
 	out.margin = {
 		...margin,
@@ -174,8 +182,8 @@ export function compactFigure(figure: Figure): Figure {
 		r: cap(margin.r, 12),
 		// the buttons (above the plot) and the slider (below it) of an animation sit in the
 		// margins, and Plotly does not make room for a slider: 150 px fit it with its labels
-		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) ? 44 : 16),
-		b: controls ? Math.max(typeof margin.b === 'number' ? margin.b : 0, 150) : cap(margin.b, titled('x') ? 64 : 16),
+		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) && !title ? 44 : 16),
+		b: controls ? Math.max(typeof margin.b === 'number' ? margin.b : 0, 150) + (moved ? 50 : 0) : cap(margin.b, titled('x') ? 64 : 16),
 		pad: 0,
 	};
 	for (const key of axes) {
@@ -190,6 +198,12 @@ export function compactFigure(figure: Figure): Figure {
 		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom' };
 	}
 	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
+	if (title) out.title = { text: '' }; // shown above the figure, see movableTitle
+	if (moved) {
+		out.sliders = sliders.map((slider) =>
+			besideButtons(slider) ? { ...slider, x: 0, len: 1, pad: { ...slider.pad, t: (slider.pad?.t ?? 20) + 50 } } : slider
+		);
+	}
 	for (const key of Object.keys(layout).filter((key) => /^coloraxis\d*$/.test(key))) {
 		const bar = compactColorbar(layout[key]?.colorbar);
 		if (bar) out[key] = { ...layout[key], colorbar: bar };
@@ -201,6 +215,19 @@ export function compactFigure(figure: Figure): Figure {
 		return { ...trace, ...(bar ? { colorbar: bar } : {}), ...(markerBar ? { marker: { ...trace.marker, colorbar: markerBar } } : {}) };
 	});
 	return { ...figure, ...(data ? { data } : {}), layout: out };
+}
+
+/**
+ * The title that a narrow screen shows as text above the figure instead of in it, where Plotly
+ * cannot wrap it and it collides with the legend: the figure's title, unless an animation's
+ * frames change it. Plotly's markup (`<br>`, `<sub>`, ...) is dropped.
+ */
+export function movableTitle(figure: Figure): string {
+	if (figure.frames?.some((frame) => frame.layout?.title !== undefined)) return '';
+	return titleText(figure.layout?.title)
+		.replace(/<br\s*\/?>/gi, ' ')
+		.replace(/<[^>]+>/g, '')
+		.trim();
 }
 
 /** Whether a figure has controls below or above the plot: a slider or buttons (an animation). */
