@@ -168,7 +168,8 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 			plot.style.width = '100%';
 			plot.style.height = '100%';
 			element.replaceChildren(plot);
-			await Plotly.newPlot(plot, themed(figure, thumbnail), config(thumbnail));
+			// with a figure object, Plotly reads the config from the object, not from a third argument
+			await Plotly.newPlot(plot, { ...themed(figure, thumbnail), config: config(thumbnail) });
 			rendered.push({ element: plot, figure, thumbnail, Plotly });
 		} catch (error) {
 			element.textContent = `Could not load the figure (${(error as Error).message}).`;

@@ -157,8 +157,8 @@ function compactColorbar(colorbar: unknown): Record<string, any> | undefined {
 /**
  * The figure for a narrow screen, as chart tools for the web lay them out on phones: the legend
  * in a row above the plot instead of beside it, small margins (the axes make room for their
- * tick labels), at most six ticks on an x axis, a font of at most 12 px and thin colorbars. The
- * data stay as they are.
+ * tick labels; with a slider the bottom one stays), at most six ticks on an x axis, a font of
+ * at most 12 px and thin colorbars. The data stay as they are.
  */
 export function compactFigure(figure: Figure): Figure {
 	const layout = figure.layout ?? {};
@@ -172,7 +172,8 @@ export function compactFigure(figure: Figure): Figure {
 		l: cap(margin.l, titled('y') ? 56 : 16),
 		r: cap(margin.r, 12),
 		t: cap(margin.t, titleText(layout.title) ? 44 : 16),
-		b: cap(margin.b, titled('x') ? 48 : 16),
+		// a slider below the plot keeps the figure's own margin, which Plotly sizes for it
+		b: hasControls(figure) ? (margin.b ?? 80) : cap(margin.b, titled('x') ? 48 : 16),
 		pad: 0,
 	};
 	for (const key of axes) {

@@ -141,6 +141,8 @@ describe('compactFigure', () => {
 		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
 		expect(layout).not.toHaveProperty('legend');
 		expect(compactFigure({}).layout!.margin.l).toBe(16);
+		expect(compactFigure({ layout: { sliders: [{}], margin: { b: 90 } } }).layout!.margin.b).toBe(90);
+		expect(compactFigure({ layout: { sliders: [{}] } }).layout!.margin.b).toBe(80);
 	});
 });
 
