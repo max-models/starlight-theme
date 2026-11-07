@@ -1,7 +1,10 @@
 ---
 // An interactive Plotly figure, loaded from the JSON a gallery script's `fig.show()` left under
 // public/ (written by the starlight-gallery tool). plotly.js is a separate chunk that is fetched
-// only when a figure scrolls into view, and the figure follows the site's light/dark theme.
+// only when a figure scrolls into view, and the figure follows the site's light/dark theme: text,
+// grid and backgrounds, the data palette (--mm-data-1..8 in styles/theme.css) for the traces in
+// a default colour, and the text colour for black ones. A web figure (maxplotlib.web, `*.plotly.json`) adds hints in
+// layout.meta.web: its aspect ratio, a text alternative and a white plot area (see the README).
 import { withBase } from '../utils/base';
 
 export interface Props {
@@ -9,27 +12,43 @@ export interface Props {
 	src: string;
 	/** A small, static preview without legend, titles and tick labels (the cards of the gallery). */
 	thumbnail?: boolean;
+	/** A text alternative; default: the figure's `alt` hint. */
+	alt?: string;
+	/** Width over height, to reserve the space before the figure loads; default: the figure's `aspect` hint. */
+	aspect?: number;
 }
-const { src, thumbnail = false } = Astro.props;
+const { src, thumbnail = false, alt, aspect } = Astro.props;
 ---
 
-<div class:list={['plotly-figure', { thumbnail }]} data-plotly={withBase(src)} data-thumbnail={thumbnail ? '' : undefined}>
+<div
+	class:list={['plotly-figure', { thumbnail, 'has-aspect': !thumbnail && aspect }]}
+	data-plotly={withBase(src)}
+	data-thumbnail={thumbnail ? '' : undefined}
+	role="figure"
+	aria-label={alt}
+	style={!thumbnail && aspect ? `aspect-ratio: ${aspect}` : undefined}
+>
 	<span class="plotly-status" aria-live="polite">Loading figure…</span>
 </div>
 
 <script>
+	import { PALETTE_SIZE, paletteFigure, webHints, type Figure } from '../lib/plotly-theme.ts';
+
 	type Layout = Record<string, any>;
 
 	const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+	const palette = () =>
+		Array.from({ length: PALETTE_SIZE }, (_, i) => css(`--mm-data-${i + 1}`)).filter(Boolean);
+
 	// Colours of the current theme, applied over whatever template the script's figure used.
-	function themeLayout(layout: Layout): Layout {
+	function themeLayout(layout: Layout, whitePlot = false): Layout {
 		const text = css('--sl-color-text');
 		const grid = css('--sl-color-hairline');
 		const axis = { gridcolor: grid, zerolinecolor: css('--sl-color-hairline-light'), linecolor: css('--sl-color-hairline-light'), tickcolor: css('--sl-color-hairline-light') };
 		const update: Layout = {
 			paper_bgcolor: 'rgba(0,0,0,0)',
-			plot_bgcolor: 'rgba(0,0,0,0)',
+			plot_bgcolor: whitePlot ? 'white' : 'rgba(0,0,0,0)',
 			'font.color': text,
 			'font.family': css('--sl-font') || 'system-ui, sans-serif',
 			'legend.bgcolor': 'rgba(0,0,0,0)',
@@ -88,7 +107,19 @@ const { src, thumbnail = false } = Astro.props;
 		return target;
 	}
 
-	const rendered: { element: HTMLElement; layout: Layout; Plotly: any }[] = [];
+	// The figure as plotted: the site's palette and theme colours over a copy of the file's figure.
+	function themed(source: Figure, thumbnail: boolean) {
+		// a white plot area keeps the figure's own colours, chosen for a white background
+		const whitePlot = webHints(source).white_plot === true;
+		const figure = whitePlot ? structuredClone(source) : paletteFigure(structuredClone(source), palette(), css('--sl-color-text'));
+		const layout: Layout = figure.layout ?? {};
+		layout.uirevision ??= 'theme'; // keep zoom and pan when the theme changes
+		if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
+		merge(layout, expand(themeLayout(layout, whitePlot)));
+		return { data: figure.data, layout, frames: thumbnail ? [] : figure.frames };
+	}
+
+	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any }[] = [];
 
 	async function render(element: HTMLElement) {
 		const thumbnail = element.hasAttribute('data-thumbnail');
@@ -99,18 +130,21 @@ const { src, thumbnail = false } = Astro.props;
 				import('plotly.js-dist-min'),
 			]);
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-			const figure = await response.json();
+			const figure: Figure = await response.json();
 			const Plotly = module.default ?? module;
-			const layout: Layout = figure.layout ?? {};
-			if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
-			merge(layout, expand(themeLayout(layout)));
+			const hints = webHints(figure);
+			if (!thumbnail && !element.classList.contains('has-aspect') && typeof hints.aspect === 'number' && hints.aspect > 0) {
+				element.style.aspectRatio = String(hints.aspect);
+				element.classList.add('has-aspect');
+			}
+			if (!element.hasAttribute('aria-label') && (hints.alt || hints.title)) element.setAttribute('aria-label', (hints.alt || hints.title)!);
 			element.replaceChildren();
-			await Plotly.newPlot(element, { data: figure.data, layout, frames: thumbnail ? [] : figure.frames }, {
+			await Plotly.newPlot(element, themed(figure, thumbnail), {
 				responsive: true,
 				displaylogo: false,
 				staticPlot: thumbnail,
 			});
-			rendered.push({ element, layout, Plotly });
+			rendered.push({ element, figure, thumbnail, Plotly });
 		} catch (error) {
 			element.textContent = `Could not load the figure (${(error as Error).message}).`;
 		}
@@ -130,7 +164,7 @@ const { src, thumbnail = false } = Astro.props;
 
 	// the theme toggle sets data-theme on <html>
 	new MutationObserver(() => {
-		for (const { element, layout, Plotly } of rendered) Plotly.relayout(element, themeLayout(layout));
+		for (const { element, figure, thumbnail, Plotly } of rendered) Plotly.react(element, themed(figure, thumbnail));
 	}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 </script>
 
@@ -142,6 +176,9 @@ const { src, thumbnail = false } = Astro.props;
 		border-radius: 0.75rem;
 		padding: 0.5rem;
 		background: color-mix(in srgb, var(--sl-color-gray-5, #888) 8%, transparent);
+	}
+	.plotly-figure.has-aspect {
+		min-height: 12rem;
 	}
 	.plotly-figure.thumbnail {
 		min-height: 0;

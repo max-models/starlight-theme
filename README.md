@@ -354,6 +354,41 @@ docs-build:  ## the static site in docs/dist, as in CI
 	cd docs && npx starlight-check-mdx && $(DOCS_ENV) npx astro build
 ```
 
+### Plotly figures
+
+`PlotlyFigure` shows a Plotly figure from its JSON on any page, the way the gallery and the
+notebooks show theirs: plotly.js is a separate chunk loaded only when the figure scrolls into
+view, so a page without figures does not load it, and the figure is drawn in the site's light or
+dark colours, which follow the theme toggle (text, grid and backgrounds, and the data palette
+below). Put the file under `docs/public/` and use it in an MDX page:
+
+```mdx
+import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.astro';
+
+<PlotlyFigure src="/figures/waves.plotly.json" alt="A sine and a cosine wave" aspect={2} />
+```
+
+`src` is relative to the site root (the component adds the base path); `alt` and `aspect` (width
+over height, so the page reserves the space before the figure loads) are optional and default to
+the figure's hints.
+
+**Web figures.** maxplotlib writes figures for this component, from a maxplotlib `Canvas` or any
+Plotly figure: `canvas.savefig("docs/public/figures/waves.plotly.json", backend="plotly")` or
+`maxplotlib.web.write_web_figure(fig, path, alt=...)` (plasma-plots through maxplotlib). A web
+figure is Plotly JSON without a template, a fixed size or backgrounds of its own, with hints in
+`layout.meta.web`: `version`, `title`, `alt`, `aspect` and `white_plot`. Any other Plotly JSON
+(`fig.write_json(...)`) works too, without the hints.
+
+**The data palette.** `styles/theme.css` defines eight data colours, `--mm-data-1` to
+`--mm-data-8`, after the colour-blind safe palette of Okabe and Ito, lighter in dark mode. They
+are the colorway of every figure, so traces without a colour of their own take them in order. A
+trace whose colour came from a default cycle carries its position as `trace.meta.color_slot`
+(maxplotlib sets it for Matplotlib's `C0`..`C9`, Plotly's colorway and Okabe–Ito) and takes the
+palette colour of that position; a black trace, such as a reference curve, takes the text
+colour. Other colours and colormaps stay. A figure with `white_plot` keeps a white plot area
+and its own colours, for figures whose colours were chosen for a white background. A site can
+override the palette in its `customCss`, for both `:root` (dark) and `:root[data-theme='light']`.
+
 ### Method cards
 
 A package whose numerical methods carry [method cards](https://github.com/max-models/methodcard)
