@@ -157,8 +157,8 @@ function compactColorbar(colorbar: unknown): Record<string, any> | undefined {
 /**
  * The figure for a narrow screen, as chart tools for the web lay them out on phones: the legend
  * in a row above the plot instead of beside it, small margins (the axes make room for their
- * tick labels; with a slider the bottom one stays), at most six ticks on an x axis, a font of
- * at most 12 px and thin colorbars. The data stay as they are.
+ * tick labels; room for the buttons and slider of an animation), at most six ticks on an x
+ * axis, a font of at most 12 px and thin colorbars. The data stay as they are.
  */
 export function compactFigure(figure: Figure): Figure {
 	const layout = figure.layout ?? {};
@@ -172,9 +172,10 @@ export function compactFigure(figure: Figure): Figure {
 		...margin,
 		l: cap(margin.l, titled('y') ? 56 : 16),
 		r: cap(margin.r, 12),
-		// the buttons and the slider of an animation sit in the margins: those keep their size
-		t: controls ? cap(margin.t, 100) : cap(margin.t, titleText(layout.title) ? 44 : 16),
-		b: controls ? cap(margin.b, 80) : cap(margin.b, titled('x') ? 64 : 16),
+		// the buttons (above the plot) and the slider (below it) of an animation sit in the
+		// margins, and Plotly does not make room for a slider: 150 px fit it with its labels
+		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) ? 44 : 16),
+		b: controls ? Math.max(typeof margin.b === 'number' ? margin.b : 0, 150) : cap(margin.b, titled('x') ? 64 : 16),
 		pad: 0,
 	};
 	for (const key of axes) {
@@ -189,12 +190,6 @@ export function compactFigure(figure: Figure): Figure {
 		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom' };
 	}
 	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
-	if (Array.isArray(layout.sliders)) {
-		out.sliders = layout.sliders.map((slider: Record<string, any>) => ({
-			...slider,
-			pad: { ...slider.pad, t: Math.min(slider.pad?.t ?? 20, 24) },
-		}));
-	}
 	for (const key of Object.keys(layout).filter((key) => /^coloraxis\d*$/.test(key))) {
 		const bar = compactColorbar(layout[key]?.colorbar);
 		if (bar) out[key] = { ...layout[key], colorbar: bar };

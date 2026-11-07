@@ -141,9 +141,9 @@ describe('compactFigure', () => {
 		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
 		expect(layout).not.toHaveProperty('legend');
 		expect(compactFigure({}).layout!.margin.l).toBe(16);
-		const movie = compactFigure({ layout: { sliders: [{ pad: { t: 50, l: 5 } }], margin: { b: 60 } } }).layout!;
-		expect(movie.margin).toMatchObject({ t: 100, b: 60 });
-		expect(movie.sliders[0].pad).toEqual({ t: 24, l: 5 });
+		const movie = compactFigure({ layout: { sliders: [{}], margin: { b: 60 } } }).layout!;
+		expect(movie.margin).toMatchObject({ t: 70, b: 150 });
+		expect(compactFigure({ layout: { updatemenus: [{}], margin: { t: 40, b: 200 } } }).layout!.margin).toMatchObject({ t: 40, b: 200 });
 	});
 });
 
