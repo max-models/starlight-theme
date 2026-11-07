@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { colorSlot, isBlack, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { colorSlot, compactFigure, hasControls, isBlack, movableTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -98,5 +98,91 @@ describe('themeControls', () => {
 
 	it('leaves a layout without controls alone', () => {
 		expect(themeControls({ xaxis: {} }, colors)).toEqual({ xaxis: {} });
+	});
+});
+
+describe('compactFigure', () => {
+	const figure = {
+		data: [{ type: 'heatmap', colorbar: { title: 'φ' } }, { type: 'scatter', marker: { colorbar: { thickness: 20 } } }, { y: [1] }],
+		layout: {
+			title: { text: 'Energy' },
+			margin: { l: 80, r: 80, t: 100, b: 80 },
+			xaxis: { title: 't' },
+			yaxis: { title: { text: 'E', standoff: 12 }, tickvals: [0, 1] },
+			xaxis2: { tickvals: [0, 1] },
+			legend: { x: 1.02, y: 1, font: { size: 9 } },
+			font: { size: 14 },
+			coloraxis: { colorbar: { thickness: 30 } },
+		},
+	};
+
+	it('puts the legend above the plot and shrinks margins, font and colorbars', () => {
+		const out = compactFigure(figure);
+		const layout = out.layout!;
+		expect(layout.legend).toEqual({ x: 0, y: 1, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'top', yref: 'container' });
+		expect(layout.margin).toEqual({ l: 56, r: 12, t: 16, b: 64, pad: 0 });
+		expect(layout.title).toEqual({ text: '' }); // shown above the figure instead
+		expect(layout.font.size).toBe(12);
+		expect(layout.coloraxis.colorbar.thickness).toBe(10);
+		expect(out.data![0].colorbar).toEqual({ title: 'φ', thickness: 10, xpad: 4 });
+		expect(out.data![1].marker.colorbar.thickness).toBe(10);
+		expect(out.data![2]).toBe(figure.data[2]);
+		expect(figure.layout.legend.x).toBe(1.02); // the input is unchanged
+	});
+
+	it('gives the axes automargin, a title standoff and fewer x ticks', () => {
+		const layout = compactFigure(figure).layout!;
+		expect(layout.xaxis).toEqual({ title: { text: 't', standoff: 6 }, automargin: true, nticks: 6 });
+		expect(layout.yaxis).toEqual({ title: { text: 'E', standoff: 12 }, tickvals: [0, 1], automargin: true });
+		expect(layout.xaxis2).toEqual({ tickvals: [0, 1], automargin: true });
+	});
+
+	it('keeps small margins, a hidden legend and a figure without a layout', () => {
+		const layout = compactFigure({ layout: { margin: { l: 4, b: 2 }, showlegend: false } }).layout!;
+		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
+		expect(layout).not.toHaveProperty('legend');
+		expect(compactFigure({}).layout!.margin.l).toBe(16);
+		const movie = compactFigure({ layout: { sliders: [{}], margin: { b: 60 } } }).layout!;
+		expect(movie.margin).toMatchObject({ t: 70, b: 150 });
+		expect(compactFigure({ layout: { updatemenus: [{}], margin: { t: 40, b: 200 } } }).layout!.margin).toMatchObject({ t: 40, b: 200 });
+	});
+});
+
+describe('hasControls', () => {
+	it('finds sliders and buttons', () => {
+		expect(hasControls({ layout: { sliders: [{}] } })).toBe(true);
+		expect(hasControls({ layout: { updatemenus: [{}] } })).toBe(true);
+		expect(hasControls({ layout: { sliders: [] } })).toBe(false);
+		expect(hasControls({})).toBe(false);
+	});
+});
+
+describe('movableTitle', () => {
+	it('takes a fixed title out of the figure, without markup', () => {
+		expect(movableTitle({ layout: { title: { text: 'Power<br>per bin of E<sub>φ</sub>' } } })).toBe('Power per bin of Eφ');
+		expect(movableTitle({ layout: { title: 'Energy' } })).toBe('Energy');
+		expect(movableTitle({ layout: {} })).toBe('');
+	});
+
+	it('keeps a title that the frames of an animation change', () => {
+		const movie = { layout: { title: 't = 0' }, frames: [{ layout: { title: 't = 1' } }] };
+		expect(movableTitle(movie)).toBe('');
+		expect(compactFigure(movie).layout!.title).toBe('t = 0');
+	});
+});
+
+describe('compactFigure with an animation', () => {
+	it('moves a slider below the buttons in its row', () => {
+		const layout = {
+			margin: { b: 145 },
+			updatemenus: [{ type: 'buttons', x: 0, y: 0, buttons: [{}, {}] }],
+			sliders: [{ x: 0.08, len: 0.92, y: 0, pad: { t: 45 } }],
+		};
+		const out = compactFigure({ layout }).layout!;
+		expect(out.sliders[0]).toEqual({ x: 0, len: 1, y: 0, pad: { t: 95 } });
+		expect(out.margin.b).toBe(200);
+		// a slider in a row of its own stays
+		const alone = compactFigure({ layout: { updatemenus: [{ x: 0, y: 1.1 }], sliders: [{ x: 0.1, y: 0 }] } }).layout!;
+		expect(alone.sliders[0]).toEqual({ x: 0.1, y: 0 });
 	});
 });
