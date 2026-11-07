@@ -131,20 +131,27 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 			]);
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 			const figure: Figure = await response.json();
-			const Plotly = module.default ?? module;
+			// plotly.js is a UMD build: bundled, it is the module's default export; served as is (the
+			// dev server of a site that installs the theme), it only sets window.Plotly
+			const Plotly = module.default ?? (typeof module.newPlot === 'function' ? module : (window as any).Plotly);
 			const hints = webHints(figure);
 			if (!thumbnail && !element.classList.contains('has-aspect') && typeof hints.aspect === 'number' && hints.aspect > 0) {
 				element.style.aspectRatio = String(hints.aspect);
 				element.classList.add('has-aspect');
 			}
 			if (!element.hasAttribute('aria-label') && (hints.alt || hints.title)) element.setAttribute('aria-label', (hints.alt || hints.title)!);
-			element.replaceChildren();
-			await Plotly.newPlot(element, themed(figure, thumbnail), {
+			// plotted into an inner box: Plotly sizes a plot to the border box of its element, which
+			// would overflow the padding of the frame
+			const plot = document.createElement('div');
+			plot.style.width = '100%';
+			plot.style.height = '100%';
+			element.replaceChildren(plot);
+			await Plotly.newPlot(plot, themed(figure, thumbnail), {
 				responsive: true,
 				displaylogo: false,
 				staticPlot: thumbnail,
 			});
-			rendered.push({ element, figure, thumbnail, Plotly });
+			rendered.push({ element: plot, figure, thumbnail, Plotly });
 		} catch (error) {
 			element.textContent = `Could not load the figure (${(error as Error).message}).`;
 		}
