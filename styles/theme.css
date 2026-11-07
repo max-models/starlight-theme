@@ -30,6 +30,17 @@
 	--sl-color-black: #0a1823;
 
 	--sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+	/* the data palette of figures (PlotlyFigure), after Okabe and Ito: colour-blind safe, in the
+	   order of their palette, lighter in dark mode */
+	--mm-data-1: #4fa8e0;
+	--mm-data-2: #f0b030;
+	--mm-data-3: #2fc79a;
+	--mm-data-4: #f07a3a;
+	--mm-data-5: #e08fc0;
+	--mm-data-6: #8fd0f5;
+	--mm-data-7: #e8dc4a;
+	--mm-data-8: #a8b0b6;
 }
 
 :root[data-theme='light'] {
@@ -55,6 +66,15 @@
 	--sl-color-gray-6: #e8e5dc;
 	--sl-color-gray-7: #efece3;
 	--sl-color-black: #fbf9f3;
+
+	--mm-data-1: #0072b2;
+	--mm-data-2: #c98a00;
+	--mm-data-3: #009e73;
+	--mm-data-4: #d55e00;
+	--mm-data-5: #b55d92;
+	--mm-data-6: #3d9fd6;
+	--mm-data-7: #a69500;
+	--mm-data-8: #5f6b73;
 }
 
 /* API reference: a hidden Markdown heading above an <Autodoc> block feeds "On this page". */
