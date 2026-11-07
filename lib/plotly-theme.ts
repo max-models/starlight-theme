@@ -133,3 +133,75 @@ export function themeControls(layout: Record<string, any>, colors: ControlColors
 	}
 	return out;
 }
+
+/**
+ * The media query of a narrow (phone) screen, on which a figure is shown compact: see
+ * `compactFigure`. The same width as the CSS of components/PlotlyFigure.astro.
+ */
+export const COMPACT_QUERY = '(max-width: 40rem)';
+
+const CARTESIAN_AXIS = /^[xy]axis\d*$/;
+
+function titleText(title: unknown): string {
+	if (typeof title === 'string') return title;
+	if (title && typeof title === 'object' && typeof (title as any).text === 'string') return (title as any).text;
+	return '';
+}
+
+function compactColorbar(colorbar: unknown): Record<string, any> | undefined {
+	if (!colorbar || typeof colorbar !== 'object') return undefined;
+	const bar = colorbar as Record<string, any>;
+	return { ...bar, thickness: Math.min(bar.thickness ?? 30, 10), xpad: Math.min(bar.xpad ?? 10, 4) };
+}
+
+/**
+ * The figure for a narrow screen, as chart tools for the web lay them out on phones: the legend
+ * in a row above the plot instead of beside it, small margins (the axes make room for their
+ * tick labels), at most six ticks on an x axis, a font of at most 12 px and thin colorbars. The
+ * data stay as they are.
+ */
+export function compactFigure(figure: Figure): Figure {
+	const layout = figure.layout ?? {};
+	const out: Record<string, any> = { ...layout };
+	const axes = Object.keys(layout).filter((key) => CARTESIAN_AXIS.test(key));
+	const titled = (prefix: string) => axes.some((key) => key.startsWith(prefix) && titleText(layout[key]?.title));
+	const margin = layout.margin ?? {};
+	const cap = (value: unknown, max: number) => Math.min(typeof value === 'number' ? value : max, max);
+	out.margin = {
+		...margin,
+		l: cap(margin.l, titled('y') ? 56 : 16),
+		r: cap(margin.r, 12),
+		t: cap(margin.t, titleText(layout.title) ? 44 : 16),
+		b: cap(margin.b, titled('x') ? 48 : 16),
+		pad: 0,
+	};
+	for (const key of axes) {
+		const axis = { ...layout[key], automargin: true };
+		const text = titleText(axis.title);
+		// without a standoff Plotly pins an automargin axis's title to the edge of the figure
+		if (text) axis.title = { ...(typeof axis.title === 'object' ? axis.title : { text }), standoff: axis.title?.standoff ?? 6 };
+		if (key.startsWith('x') && axis.tickvals === undefined && axis.dtick === undefined && axis.nticks === undefined) axis.nticks = 6;
+		out[key] = axis;
+	}
+	if (layout.showlegend !== false) {
+		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom' };
+	}
+	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
+	for (const key of Object.keys(layout).filter((key) => /^coloraxis\d*$/.test(key))) {
+		const bar = compactColorbar(layout[key]?.colorbar);
+		if (bar) out[key] = { ...layout[key], colorbar: bar };
+	}
+	const data = figure.data?.map((trace) => {
+		const bar = compactColorbar(trace.colorbar);
+		const markerBar = compactColorbar(trace.marker?.colorbar);
+		if (!bar && !markerBar) return trace;
+		return { ...trace, ...(bar ? { colorbar: bar } : {}), ...(markerBar ? { marker: { ...trace.marker, colorbar: markerBar } } : {}) };
+	});
+	return { ...figure, ...(data ? { data } : {}), layout: out };
+}
+
+/** Whether a figure has controls below or above the plot: a slider or buttons (an animation). */
+export function hasControls(figure: Figure): boolean {
+	const layout = figure.layout ?? {};
+	return (Array.isArray(layout.sliders) && layout.sliders.length > 0) || (Array.isArray(layout.updatemenus) && layout.updatemenus.length > 0);
+}
