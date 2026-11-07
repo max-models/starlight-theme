@@ -166,14 +166,15 @@ export function compactFigure(figure: Figure): Figure {
 	const axes = Object.keys(layout).filter((key) => CARTESIAN_AXIS.test(key));
 	const titled = (prefix: string) => axes.some((key) => key.startsWith(prefix) && titleText(layout[key]?.title));
 	const margin = layout.margin ?? {};
+	const controls = hasControls(figure);
 	const cap = (value: unknown, max: number) => Math.min(typeof value === 'number' ? value : max, max);
 	out.margin = {
 		...margin,
 		l: cap(margin.l, titled('y') ? 56 : 16),
 		r: cap(margin.r, 12),
-		t: cap(margin.t, titleText(layout.title) ? 44 : 16),
-		// a slider below the plot keeps the figure's own margin, which Plotly sizes for it
-		b: hasControls(figure) ? (margin.b ?? 80) : cap(margin.b, titled('x') ? 48 : 16),
+		// the buttons and the slider of an animation sit in the margins: those keep their size
+		t: controls ? cap(margin.t, 100) : cap(margin.t, titleText(layout.title) ? 44 : 16),
+		b: controls ? cap(margin.b, 80) : cap(margin.b, titled('x') ? 64 : 16),
 		pad: 0,
 	};
 	for (const key of axes) {
@@ -188,6 +189,12 @@ export function compactFigure(figure: Figure): Figure {
 		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom' };
 	}
 	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
+	if (Array.isArray(layout.sliders)) {
+		out.sliders = layout.sliders.map((slider: Record<string, any>) => ({
+			...slider,
+			pad: { ...slider.pad, t: Math.min(slider.pad?.t ?? 20, 24) },
+		}));
+	}
 	for (const key of Object.keys(layout).filter((key) => /^coloraxis\d*$/.test(key))) {
 		const bar = compactColorbar(layout[key]?.colorbar);
 		if (bar) out[key] = { ...layout[key], colorbar: bar };

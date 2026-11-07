@@ -120,7 +120,7 @@ describe('compactFigure', () => {
 		const out = compactFigure(figure);
 		const layout = out.layout!;
 		expect(layout.legend).toEqual({ x: 0, y: 1.02, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'bottom' });
-		expect(layout.margin).toEqual({ l: 56, r: 12, t: 44, b: 48, pad: 0 });
+		expect(layout.margin).toEqual({ l: 56, r: 12, t: 44, b: 64, pad: 0 });
 		expect(layout.font.size).toBe(12);
 		expect(layout.coloraxis.colorbar.thickness).toBe(10);
 		expect(out.data![0].colorbar).toEqual({ title: 'φ', thickness: 10, xpad: 4 });
@@ -141,8 +141,9 @@ describe('compactFigure', () => {
 		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
 		expect(layout).not.toHaveProperty('legend');
 		expect(compactFigure({}).layout!.margin.l).toBe(16);
-		expect(compactFigure({ layout: { sliders: [{}], margin: { b: 90 } } }).layout!.margin.b).toBe(90);
-		expect(compactFigure({ layout: { sliders: [{}] } }).layout!.margin.b).toBe(80);
+		const movie = compactFigure({ layout: { sliders: [{ pad: { t: 50, l: 5 } }], margin: { b: 60 } } }).layout!;
+		expect(movie.margin).toMatchObject({ t: 100, b: 60 });
+		expect(movie.sliders[0].pad).toEqual({ t: 24, l: 5 });
 	});
 });
 
