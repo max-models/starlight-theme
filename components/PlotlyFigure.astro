@@ -32,7 +32,7 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 </div>
 
 <script>
-	import { PALETTE_SIZE, paletteFigure, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { PALETTE_SIZE, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
 
 	type Layout = Record<string, any>;
 
@@ -116,7 +116,13 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 		layout.uirevision ??= 'theme'; // keep zoom and pan when the theme changes
 		if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
 		merge(layout, expand(themeLayout(layout, whitePlot)));
-		return { data: figure.data, layout, frames: thumbnail ? [] : figure.frames };
+		const controls = themeControls(layout, {
+			text: css('--sl-color-text'),
+			background: css('--sl-color-gray-6'),
+			border: css('--sl-color-hairline-light'),
+			active: css('--sl-color-accent'),
+		});
+		return { data: figure.data, layout: controls, frames: thumbnail ? [] : figure.frames };
 	}
 
 	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any }[] = [];
