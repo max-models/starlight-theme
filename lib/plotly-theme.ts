@@ -68,6 +68,14 @@ export function colorSlot(trace: Trace): number | null {
 	return Number.isInteger(slot) && slot >= 0 ? slot : null;
 }
 
+/** Trace types that colour an area by value: text on them is coloured against the colour map. */
+const COLOR_MAPS = /^(heatmap|histogram2d|histogram2dcontour|contour|image|densitymapbox)$/;
+
+/** Whether a trace colours an area by value, so that its own text keeps its colours. */
+export function isColorMap(trace: Trace): boolean {
+	return typeof trace?.type === 'string' && COLOR_MAPS.test(trace.type);
+}
+
 /**
  * The trace in the site's colours wherever it had a single colour (the line, the markers and the
  * fill, keeping a fill's transparency): the palette colour of its slot; else `ink` (the text
@@ -85,6 +93,7 @@ export function recolorTrace(trace: Trace, palette: string[], ink?: string, pape
 	let changed = false;
 	for (const key of ['line', 'marker', 'textfont'] as const) {
 		const value = trace[key]?.color;
+		if (key === 'textfont' && isColorMap(trace)) continue; // cell labels contrast with the colour map
 		const swapped = key === 'textfont' ? inkAndPaper(value, ink, paper) : swap(value);
 		if (typeof value === 'string' && swapped !== value) {
 			out[key] = { ...trace[key], color: swapped };
@@ -283,9 +292,12 @@ export interface PageColors {
  * The layout as web charts draw it: the axes' lines only at the bottom and left (no box), short
  * ticks in the line colour, quiet tick labels, light grid lines (where the figure has them), hover
  * labels in the page's colours, and black and white annotations and shapes in the page's text and
- * background colours.
+ * background colours. Annotations placed in the data of axes that show a colour map (`data`)
+ * keep their colours, chosen against it.
  */
-export function calmLayout(layout: Record<string, any>, colors: PageColors): Record<string, any> {
+export function calmLayout(layout: Record<string, any>, colors: PageColors, data: Trace[] = []): Record<string, any> {
+	const mapped = new Set(data.filter(isColorMap).flatMap((trace) => [trace.xaxis ?? 'x', trace.yaxis ?? 'y']));
+	const onColorMap = (note: Record<string, any>) => mapped.has(note.xref ?? 'x') && mapped.has(note.yref ?? 'y');
 	const out: Record<string, any> = { ...layout };
 	for (const key of Object.keys(layout).filter((key) => CARTESIAN_AXIS.test(key))) {
 		const axis = layout[key] ?? {};
@@ -309,12 +321,12 @@ export function calmLayout(layout: Record<string, any>, colors: PageColors): Rec
 		font: { ...layout.hoverlabel?.font, color: colors.text, family: colors.font },
 	};
 	if (Array.isArray(layout.annotations)) {
-		out.annotations = layout.annotations.map((note: Record<string, any>) => ({
+		out.annotations = layout.annotations.map((note: Record<string, any>) => onColorMap(note) ? note : {
 			...note,
 			...(note.font?.color ? { font: { ...note.font, color: inkAndPaper(note.font.color, colors.text, colors.background) } } : {}),
 			...(note.arrowcolor ? { arrowcolor: inkAndPaper(note.arrowcolor, colors.text, colors.background) } : {}),
 			...(note.bgcolor ? { bgcolor: inkAndPaper(note.bgcolor, colors.text, colors.background) } : {}),
-		}));
+		});
 	}
 	if (Array.isArray(layout.shapes)) {
 		out.shapes = layout.shapes.map((shape: Record<string, any>) => ({

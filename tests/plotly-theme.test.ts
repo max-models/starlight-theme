@@ -242,3 +242,23 @@ describe('calmLayout', () => {
 		expect(out.shapes[2].fillcolor).toBe('#ff0000');
 	});
 });
+
+describe('labels on colour maps', () => {
+	const colors = { text: '#eee', muted: '#999', line: '#444', grid: '#222', background: '#012', hover: '#123', font: 'system-ui' };
+
+	it('keeps the colours of annotations on the data of a colour map', () => {
+		const layout = { annotations: [{ text: '0.5', x: 0, y: 0, xref: 'x', yref: 'y', font: { color: 'white' } }, { text: 'note', xref: 'paper', yref: 'paper', font: { color: 'black' } }] };
+		const out = calmLayout(layout, colors, [{ type: 'heatmap', z: [[1]] }]);
+		expect(out.annotations[0].font.color).toBe('white');
+		expect(out.annotations[1].font.color).toBe('#eee');
+		// without a colour map they take ink and paper
+		expect(calmLayout(layout, colors, [{ type: 'scatter' }]).annotations[0].font.color).toBe('#012');
+		// on other axes too
+		expect(calmLayout(layout, colors, [{ type: 'heatmap', xaxis: 'x2', yaxis: 'y2' }]).annotations[0].font.color).toBe('#012');
+	});
+
+	it('keeps the text colour of a colour map trace', () => {
+		const heatmap = { type: 'heatmap', textfont: { color: 'white' } };
+		expect(recolorTrace(heatmap, palette, '#eee', '#012')).toBe(heatmap);
+	});
+});

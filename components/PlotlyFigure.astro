@@ -151,7 +151,7 @@ const { src, thumbnail = false, alt, aspect, caption, poster } = Astro.props;
 					background: css('--sl-color-bg'),
 					hover: css('--sl-color-gray-6'),
 					font: css('--sl-font') || 'system-ui, sans-serif',
-				});
+				}, figure.data);
 		const controls = themeControls(calm, {
 			text: css('--sl-color-text'),
 			background: css('--sl-color-gray-6'),
