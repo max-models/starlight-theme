@@ -291,8 +291,8 @@ export interface PageColors {
 /**
  * The layout as web charts draw it: the axes' lines only at the bottom and left (no box), short
  * ticks in the line colour, quiet tick labels, light grid lines (where the figure has them), hover
- * labels in the page's colours, and black and white annotations and shapes in the page's text and
- * background colours. Annotations placed in the data of axes that show a colour map (`data`)
+ * labels in the page's colours, legends without a white box, and black and white annotations and
+ * shapes in the page's text and background colours. Annotations placed in the data of axes that show a colour map (`data`)
  * keep their colours, chosen against it.
  */
 export function calmLayout(layout: Record<string, any>, colors: PageColors, data: Trace[] = []): Record<string, any> {
@@ -312,6 +312,16 @@ export function calmLayout(layout: Record<string, any>, colors: PageColors, data
 			...(axis.ticks ? { ticklen: Math.min(axis.ticklen ?? 5, 4) } : {}),
 			tickfont: { ...axis.tickfont, color: colors.muted },
 			...(title && typeof title === 'object' ? { title: { ...title, font: { ...title.font, color: colors.text } } } : {}),
+		};
+	}
+	// every legend (a figure can have legend2, legend3, ...): no white box behind the page's text
+	for (const key of Object.keys(layout).filter((key) => /^legend\d*$/.test(key))) {
+		const legend = layout[key] ?? {};
+		out[key] = {
+			...legend,
+			bgcolor: legend.bgcolor ? inkAndPaper(legend.bgcolor, colors.text, colors.background) : 'rgba(0,0,0,0)',
+			...(legend.bordercolor ? { bordercolor: colors.line } : {}),
+			...(legend.font?.color ? { font: { ...legend.font, color: inkAndPaper(legend.font.color, colors.text, colors.background) } } : {}),
 		};
 	}
 	out.hoverlabel = {

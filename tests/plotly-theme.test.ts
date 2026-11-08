@@ -262,3 +262,19 @@ describe('labels on colour maps', () => {
 		expect(recolorTrace(heatmap, palette, '#eee', '#012')).toBe(heatmap);
 	});
 });
+
+describe('legends', () => {
+	const colors = { text: '#eee', muted: '#999', line: '#444', grid: '#222', background: '#012', hover: '#123', font: 'system-ui' };
+
+	it('take the page colours, every legend of a figure', () => {
+		const layout = {
+			legend: { bgcolor: 'rgba(255, 255, 255, 0.8)', x: 1 },
+			legend2: { bgcolor: 'white', bordercolor: 'black', font: { color: 'black', size: 9 } },
+			legend3: {},
+		};
+		const out = calmLayout(layout, colors);
+		expect(out.legend).toEqual({ bgcolor: 'rgba(0, 17, 34, 0.8)', x: 1 });
+		expect(out.legend2).toEqual({ bgcolor: '#012', bordercolor: '#444', font: { color: '#eee', size: 9 } });
+		expect(out.legend3).toEqual({ bgcolor: 'rgba(0,0,0,0)' });
+	});
+});
