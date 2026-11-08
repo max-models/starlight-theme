@@ -16,23 +16,49 @@ export interface Props {
 	alt?: string;
 	/** Width over height, to reserve the space before the figure loads; default: the figure's `aspect` hint. */
 	aspect?: number;
+	/** A caption below the figure. */
+	caption?: string;
+	/**
+	 * Site-root path of a picture of the figure (e.g. a PNG written with it), shown until the
+	 * figure has loaded and without JavaScript, e.g. for search engines and link previews.
+	 */
+	poster?: string;
+	/** The poster for dark mode, e.g. drawn with light text; default: `poster` in both modes. */
+	posterDark?: string;
 }
-const { src, thumbnail = false, alt, aspect } = Astro.props;
+const { src, thumbnail = false, alt, aspect, caption, poster, posterDark } = Astro.props;
+const posterAlt = alt ?? caption ?? '';
+// a poster that cannot be loaded (e.g. not written by the build) leaves the "Loading" text
+const dropBroken = 'this.remove()';
 ---
 
-<div
-	class:list={['plotly-figure', { thumbnail, 'has-aspect': !thumbnail && aspect }]}
-	data-plotly={withBase(src)}
-	data-thumbnail={thumbnail ? '' : undefined}
-	role="figure"
-	aria-label={alt}
-	style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
->
-	<span class="plotly-status" aria-live="polite">Loading figure…</span>
-</div>
+<figure class:list={['plotly-wrap', { thumbnail }]} aria-label={alt}>
+	<div
+		class:list={['plotly-figure', { thumbnail, 'has-aspect': !thumbnail && aspect, 'has-poster': poster }]}
+		data-plotly={withBase(src)}
+		data-thumbnail={thumbnail ? '' : undefined}
+		style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
+	>
+		{poster && (
+			<img
+				class:list={['plotly-poster', { 'dark:sl-hidden': posterDark }]}
+				src={withBase(poster)}
+				alt={posterAlt}
+				loading="lazy"
+				decoding="async"
+				onerror={dropBroken}
+			/>
+		)}
+		{poster && posterDark && (
+			<img class="plotly-poster light:sl-hidden" src={withBase(posterDark)} alt={posterAlt} loading="lazy" decoding="async" onerror={dropBroken} />
+		)}
+		<span class="plotly-status" aria-live="polite">Loading figure…</span>
+	</div>
+	{caption && !thumbnail && <figcaption class="plotly-figcaption">{caption}</figcaption>}
+</figure>
 
 <script>
-	import { COMPACT_QUERY, PALETTE_SIZE, compactFigure, hasControls, movableTitle, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, movableTitle, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
 
 	type Layout = Record<string, any>;
 
@@ -124,12 +150,26 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 	function themed(source: Figure, thumbnail: boolean) {
 		// a white plot area keeps the figure's own colours, chosen for a white background
 		const whitePlot = webHints(source).white_plot === true;
-		const figure = whitePlot ? structuredClone(source) : paletteFigure(structuredClone(source), palette(), css('--sl-color-text'));
+		const figure = whitePlot
+			? structuredClone(source)
+			: paletteFigure(structuredClone(source), palette(), css('--sl-color-text'), css('--sl-color-bg'));
 		const layout: Layout = figure.layout ?? {};
 		layout.uirevision ??= 'theme'; // keep zoom and pan when the theme changes
 		if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
 		merge(layout, expand(themeLayout(layout, whitePlot)));
-		const controls = themeControls(layout, {
+		// axes, labels and annotations as web charts draw them; a white plot area keeps its own
+		const calm = whitePlot
+			? layout
+			: calmLayout(layout, {
+					text: css('--sl-color-text'),
+					muted: css('--sl-color-gray-2'),
+					line: css('--sl-color-hairline-light'),
+					grid: css('--sl-color-hairline'),
+					background: css('--sl-color-bg'),
+					hover: css('--sl-color-gray-6'),
+					font: css('--sl-font') || 'system-ui, sans-serif',
+				}, figure.data);
+		const controls = themeControls(calm, {
 			text: css('--sl-color-text'),
 			background: css('--sl-color-gray-6'),
 			border: css('--sl-color-hairline-light'),
@@ -174,7 +214,8 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 				element.classList.add('has-aspect');
 			}
 			if (hasControls(figure)) element.classList.add('has-controls');
-			if (!element.hasAttribute('aria-label') && (hints.alt || hints.title)) element.setAttribute('aria-label', (hints.alt || hints.title)!);
+			const wrap = element.closest('figure') ?? element;
+			if (!wrap.hasAttribute('aria-label') && !wrap.querySelector('figcaption') && (hints.alt || hints.title)) wrap.setAttribute('aria-label', (hints.alt || hints.title)!);
 			// plotted into an inner box: Plotly sizes a plot to the border box of its element, which
 			// would overflow the padding of the frame
 			const plot = document.createElement('div');
@@ -214,11 +255,24 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 </script>
 
 <style>
+	.plotly-wrap {
+		margin: 1.25rem 0;
+	}
+	.plotly-wrap.thumbnail {
+		margin: 0;
+		width: 100%;
+		height: 100%;
+	}
+	.plotly-figcaption {
+		margin-top: 0.5rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+		text-align: center;
+	}
 	.plotly-figure {
 		display: flex;
 		flex-direction: column;
 		min-height: 24rem;
-		margin-block: 1.25rem;
 		border: 1px solid var(--sl-color-hairline);
 		border-radius: 0.75rem;
 		padding: 0.5rem;
@@ -265,6 +319,20 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 		font-weight: 600;
 		line-height: 1.3;
 		text-align: center;
+	}
+	.plotly-poster {
+		flex: 1 1 auto;
+		min-height: 0;
+		width: 100%;
+		object-fit: contain;
+	}
+	/* with a poster the status is for screen readers only */
+	.plotly-figure.has-poster .plotly-status {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
 	}
 	.plotly-status {
 		color: var(--sl-color-gray-3);

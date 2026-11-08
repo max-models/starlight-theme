@@ -372,6 +372,20 @@ import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.as
 over height, so the page reserves the space before the figure loads) are optional and default to
 the figure's hints.
 
+`caption` adds a caption below the figure. `poster` (and `posterDark` for dark mode) is a picture
+of the figure, e.g. a PNG written with it, shown until plotly.js has drawn the figure and in place
+of it without JavaScript, for search engines and link previews; a poster that is missing is left
+out.
+
+The figure is drawn like a web chart: axis lines only at the bottom and left, quiet tick labels,
+light grid lines, hover labels in the page's colours. Black takes the text colour and white the
+page background ("ink and paper"), except for labels on a colour map, so a figure drawn for a white
+page, e.g. converted from Matplotlib, reads in dark mode too.
+
+On a phone the figure is laid out compact: taller than on a desktop, the legend in a row at the
+top, a fixed title as text above it, small margins and room for an animation's controls. On a
+touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
+
 **Web figures.** maxplotlib writes figures for this component, from a maxplotlib `Canvas` or any
 Plotly figure: `canvas.savefig("docs/public/figures/waves.plotly.json", backend="plotly")` or
 `maxplotlib.web.write_web_figure(fig, path, alt=...)` (plasma-plots through maxplotlib). A web

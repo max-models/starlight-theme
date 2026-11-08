@@ -39,6 +39,23 @@ export function withAlphaOf(color: string, like: unknown): string {
 }
 
 const BLACK = /^(black|#000|#000000|rgba?\(\s*0\s*,\s*0\s*,\s*0\s*(,\s*[\d.]+\s*)?\))$/i;
+const WHITE = /^(white|#fff|#ffffff|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(,\s*[\d.]+\s*)?\))$/i;
+
+/** Whether a colour is white, which a figure drawn for a white page uses as "paper". */
+export function isWhite(color: unknown): boolean {
+	return typeof color === 'string' && WHITE.test(color.trim());
+}
+
+/**
+ * Black ("ink") as the page's text colour and white ("paper") as its background, keeping the
+ * transparency; other colours are unchanged. A figure drawn for a white page then reads on a
+ * dark one too.
+ */
+export function inkAndPaper(color: unknown, ink?: string, paper?: string): unknown {
+	if (ink && isBlack(color)) return withAlphaOf(ink, color);
+	if (paper && isWhite(color)) return withAlphaOf(paper, color);
+	return color;
+}
 
 /** Whether a colour is black, which a figure uses for reference curves drawn in "ink". */
 export function isBlack(color: unknown): boolean {
@@ -51,27 +68,42 @@ export function colorSlot(trace: Trace): number | null {
 	return Number.isInteger(slot) && slot >= 0 ? slot : null;
 }
 
+/** Trace types that colour an area by value: text on them is coloured against the colour map. */
+const COLOR_MAPS = /^(heatmap|histogram2d|histogram2dcontour|contour|image|densitymapbox)$/;
+
+/** Whether a trace colours an area by value, so that its own text keeps its colours. */
+export function isColorMap(trace: Trace): boolean {
+	return typeof trace?.type === 'string' && COLOR_MAPS.test(trace.type);
+}
+
 /**
  * The trace in the site's colours wherever it had a single colour (the line, the markers and the
- * fill, keeping a fill's transparency): the palette colour of its slot, and `ink` (the text
- * colour) for black. Other colours are unchanged.
+ * fill, keeping a fill's transparency): the palette colour of its slot; else `ink` (the text
+ * colour) for black and `paper` (the background) for white, also for the markers' edges and the
+ * text. Other colours are unchanged.
  */
-export function recolorTrace(trace: Trace, palette: string[], ink?: string): Trace {
+export function recolorTrace(trace: Trace, palette: string[], ink?: string, paper?: string): Trace {
 	const slot = colorSlot(trace);
 	const color = slot !== null && palette.length ? palette[slot % palette.length] : undefined;
 	const swap = (value: unknown) => {
 		if (typeof value !== 'string') return value;
-		const target = color ?? (ink && isBlack(value) ? ink : undefined);
-		return target ? withAlphaOf(target, value) : value;
+		return color ? withAlphaOf(color, value) : inkAndPaper(value, ink, paper);
 	};
 	const out: Trace = { ...trace };
 	let changed = false;
-	for (const key of ['line', 'marker'] as const) {
+	for (const key of ['line', 'marker', 'textfont'] as const) {
 		const value = trace[key]?.color;
-		if (typeof value === 'string' && swap(value) !== value) {
-			out[key] = { ...trace[key], color: swap(value) };
+		if (key === 'textfont' && isColorMap(trace)) continue; // cell labels contrast with the colour map
+		const swapped = key === 'textfont' ? inkAndPaper(value, ink, paper) : swap(value);
+		if (typeof value === 'string' && swapped !== value) {
+			out[key] = { ...trace[key], color: swapped };
 			changed = true;
 		}
+	}
+	const edge = trace.marker?.line?.color;
+	if (typeof edge === 'string' && inkAndPaper(edge, ink, paper) !== edge) {
+		out.marker = { ...(out.marker ?? trace.marker), line: { ...trace.marker.line, color: inkAndPaper(edge, ink, paper) } };
+		changed = true;
 	}
 	if (typeof trace.fillcolor === 'string' && swap(trace.fillcolor) !== trace.fillcolor) {
 		out.fillcolor = swap(trace.fillcolor);
@@ -84,8 +116,8 @@ export function recolorTrace(trace: Trace, palette: string[], ink?: string): Tra
  * The figure's data and frames in the site's colours (see `recolorTrace`); the layout gets the
  * palette as its colorway, for the traces without a colour.
  */
-export function paletteFigure(figure: Figure, palette: string[], ink?: string): Figure {
-	const recolor = (data?: Trace[]) => data?.map((trace) => recolorTrace(trace, palette, ink));
+export function paletteFigure(figure: Figure, palette: string[], ink?: string, paper?: string): Figure {
+	const recolor = (data?: Trace[]) => data?.map((trace) => recolorTrace(trace, palette, ink, paper));
 	const out: Figure = { ...figure, data: recolor(figure.data) ?? [] };
 	if (figure.frames) out.frames = figure.frames.map((frame) => ({ ...frame, data: recolor(frame.data) }));
 	if (palette.length) out.layout = { ...(figure.layout ?? {}), colorway: palette };
@@ -236,4 +268,82 @@ export function movableTitle(figure: Figure): string {
 export function hasControls(figure: Figure): boolean {
 	const layout = figure.layout ?? {};
 	return (Array.isArray(layout.sliders) && layout.sliders.length > 0) || (Array.isArray(layout.updatemenus) && layout.updatemenus.length > 0);
+}
+
+/** The page's colours that a figure's axes, labels and annotations take (see `calmLayout`). */
+export interface PageColors {
+	/** Titles, annotations and black ("ink"). */
+	text: string;
+	/** Tick labels: quieter than the titles. */
+	muted: string;
+	/** Axis lines, ticks and zero lines. */
+	line: string;
+	/** Grid lines. */
+	grid: string;
+	/** The page background, for white ("paper"). */
+	background: string;
+	/** The background of hover labels. */
+	hover: string;
+	/** The font of the page. */
+	font: string;
+}
+
+/**
+ * The layout as web charts draw it: the axes' lines only at the bottom and left (no box), short
+ * ticks in the line colour, quiet tick labels, light grid lines (where the figure has them), hover
+ * labels in the page's colours, legends without a white box, and black and white annotations and
+ * shapes in the page's text and background colours. Annotations placed in the data of axes that show a colour map (`data`)
+ * keep their colours, chosen against it.
+ */
+export function calmLayout(layout: Record<string, any>, colors: PageColors, data: Trace[] = []): Record<string, any> {
+	const mapped = new Set(data.filter(isColorMap).flatMap((trace) => [trace.xaxis ?? 'x', trace.yaxis ?? 'y']));
+	const onColorMap = (note: Record<string, any>) => mapped.has(note.xref ?? 'x') && mapped.has(note.yref ?? 'y');
+	const out: Record<string, any> = { ...layout };
+	for (const key of Object.keys(layout).filter((key) => CARTESIAN_AXIS.test(key))) {
+		const axis = layout[key] ?? {};
+		const title = axis.title;
+		out[key] = {
+			...axis,
+			mirror: false,
+			linecolor: colors.line,
+			tickcolor: colors.line,
+			gridcolor: colors.grid,
+			zerolinecolor: colors.line,
+			...(axis.ticks ? { ticklen: Math.min(axis.ticklen ?? 5, 4) } : {}),
+			tickfont: { ...axis.tickfont, color: colors.muted },
+			...(title && typeof title === 'object' ? { title: { ...title, font: { ...title.font, color: colors.text } } } : {}),
+		};
+	}
+	// every legend (a figure can have legend2, legend3, ...): no white box behind the page's text
+	for (const key of Object.keys(layout).filter((key) => /^legend\d*$/.test(key))) {
+		const legend = layout[key] ?? {};
+		out[key] = {
+			...legend,
+			bgcolor: legend.bgcolor ? inkAndPaper(legend.bgcolor, colors.text, colors.background) : 'rgba(0,0,0,0)',
+			...(legend.bordercolor ? { bordercolor: colors.line } : {}),
+			...(legend.font?.color ? { font: { ...legend.font, color: inkAndPaper(legend.font.color, colors.text, colors.background) } } : {}),
+		};
+	}
+	out.hoverlabel = {
+		...layout.hoverlabel,
+		bgcolor: colors.hover,
+		bordercolor: colors.line,
+		font: { ...layout.hoverlabel?.font, color: colors.text, family: colors.font },
+	};
+	if (Array.isArray(layout.annotations)) {
+		out.annotations = layout.annotations.map((note: Record<string, any>) => onColorMap(note) ? note : {
+			...note,
+			...(note.font?.color ? { font: { ...note.font, color: inkAndPaper(note.font.color, colors.text, colors.background) } } : {}),
+			...(note.arrowcolor ? { arrowcolor: inkAndPaper(note.arrowcolor, colors.text, colors.background) } : {}),
+			...(note.bgcolor ? { bgcolor: inkAndPaper(note.bgcolor, colors.text, colors.background) } : {}),
+		});
+	}
+	if (Array.isArray(layout.shapes)) {
+		out.shapes = layout.shapes.map((shape: Record<string, any>) => ({
+			...shape,
+			...(shape.line?.color ? { line: { ...shape.line, color: inkAndPaper(shape.line.color, colors.text, colors.background) } } : {}),
+			...(shape.fillcolor ? { fillcolor: inkAndPaper(shape.fillcolor, colors.text, colors.background) } : {}),
+		}));
+	}
+	return out;
 }
