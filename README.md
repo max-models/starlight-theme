@@ -354,6 +354,15 @@ docs-build:  ## the static site in docs/dist, as in CI
 	cd docs && npx starlight-check-mdx && $(DOCS_ENV) npx astro build
 ```
 
+### Images in dark mode
+
+A Markdown image `![…](../../assets/figures/energy.png)` that has an `energy.dark.png` next to it
+shows the dark variant in dark mode and the image in light mode, switched with the theme toggle
+(Starlight's `light:sl-hidden` and `dark:sl-hidden` classes, a remark plugin in
+`lib/dark-images.ts`). Pages write the image once; a figure script writes both files, e.g. a
+Matplotlib figure drawn a second time in a dark style with a transparent background. Images
+without a `.dark` variant, site paths (`/…`) and remote images are shown as they are.
+
 ### Plotly figures
 
 `PlotlyFigure` shows a Plotly figure from its JSON on any page, the way the gallery and the
@@ -371,6 +380,20 @@ import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.as
 `src` is relative to the site root (the component adds the base path); `alt` and `aspect` (width
 over height, so the page reserves the space before the figure loads) are optional and default to
 the figure's hints.
+
+`caption` adds a caption below the figure. `poster` (and `posterDark` for dark mode) is a picture
+of the figure, e.g. a PNG written with it, shown until plotly.js has drawn the figure and in place
+of it without JavaScript, for search engines and link previews; a poster that is missing is left
+out.
+
+The figure is drawn like a web chart: axis lines only at the bottom and left, quiet tick labels,
+light grid lines, hover labels in the page's colours. Black takes the text colour and white the
+page background ("ink and paper"), except for labels on a colour map, so a figure drawn for a white
+page, e.g. converted from Matplotlib, reads in dark mode too.
+
+On a phone the figure is laid out compact: taller than on a desktop, the legend in a row at the
+top, a fixed title as text above it, small margins and room for an animation's controls. On a
+touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
 
 **Web figures.** maxplotlib writes figures for this component, from a maxplotlib `Canvas` or any
 Plotly figure: `canvas.savefig("docs/public/figures/waves.plotly.json", backend="plotly")` or
