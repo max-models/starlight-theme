@@ -23,8 +23,13 @@ export interface Props {
 	 * figure has loaded and without JavaScript, e.g. for search engines and link previews.
 	 */
 	poster?: string;
+	/** The poster for dark mode, e.g. drawn with light text; default: `poster` in both modes. */
+	posterDark?: string;
 }
-const { src, thumbnail = false, alt, aspect, caption, poster } = Astro.props;
+const { src, thumbnail = false, alt, aspect, caption, poster, posterDark } = Astro.props;
+const posterAlt = alt ?? caption ?? '';
+// a poster that cannot be loaded (e.g. not written by the build) leaves the "Loading" text
+const dropBroken = 'this.remove()';
 ---
 
 <figure class:list={['plotly-wrap', { thumbnail }]} aria-label={alt}>
@@ -34,7 +39,19 @@ const { src, thumbnail = false, alt, aspect, caption, poster } = Astro.props;
 		data-thumbnail={thumbnail ? '' : undefined}
 		style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
 	>
-		{poster && <img class="plotly-poster" src={withBase(poster)} alt={alt ?? caption ?? ''} loading="lazy" decoding="async" />}
+		{poster && (
+			<img
+				class:list={['plotly-poster', { 'dark:sl-hidden': posterDark }]}
+				src={withBase(poster)}
+				alt={posterAlt}
+				loading="lazy"
+				decoding="async"
+				onerror={dropBroken}
+			/>
+		)}
+		{poster && posterDark && (
+			<img class="plotly-poster light:sl-hidden" src={withBase(posterDark)} alt={posterAlt} loading="lazy" decoding="async" onerror={dropBroken} />
+		)}
 		<span class="plotly-status" aria-live="polite">Loading figure…</span>
 	</div>
 	{caption && !thumbnail && <figcaption class="plotly-figcaption">{caption}</figcaption>}
