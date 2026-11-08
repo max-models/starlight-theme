@@ -33,6 +33,7 @@ import {
 } from './methodcard.ts';
 import theme, { type LaunchService, type NavLink, type Versions } from './plugin.ts';
 import { dependencyProjects, inventoryUrl, projects as defaultProjects, type Project } from './projects.ts';
+import { remarkDarkImages } from './dark-images.ts';
 import { rehypeRebase } from './rebase.ts';
 
 type Sidebar = NonNullable<StarlightUserConfig['sidebar']>;
@@ -259,7 +260,8 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 		markdown: {
 			// $...$ and $$...$$ math in Markdown and MDX pages, rendered with KaTeX at build time
 			processor: unified({
-				remarkPlugins: [remarkMath],
+				// an image x.png with an x.dark.png next to it shows that in dark mode (lib/dark-images.ts)
+				remarkPlugins: [remarkMath, remarkDarkImages],
 				rehypePlugins,
 			}),
 		},

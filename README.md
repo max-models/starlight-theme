@@ -354,6 +354,15 @@ docs-build:  ## the static site in docs/dist, as in CI
 	cd docs && npx starlight-check-mdx && $(DOCS_ENV) npx astro build
 ```
 
+### Images in dark mode
+
+A Markdown image `![…](../../assets/figures/energy.png)` that has an `energy.dark.png` next to it
+shows the dark variant in dark mode and the image in light mode, switched with the theme toggle
+(Starlight's `light:sl-hidden` and `dark:sl-hidden` classes, a remark plugin in
+`lib/dark-images.ts`). Pages write the image once; a figure script writes both files, e.g. a
+Matplotlib figure drawn a second time in a dark style with a transparent background. Images
+without a `.dark` variant, site paths (`/…`) and remote images are shown as they are.
+
 ### Plotly figures
 
 `PlotlyFigure` shows a Plotly figure from its JSON on any page, the way the gallery and the
