@@ -26,17 +26,30 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 	data-thumbnail={thumbnail ? '' : undefined}
 	role="figure"
 	aria-label={alt}
-	style={!thumbnail && aspect ? `aspect-ratio: ${aspect}` : undefined}
+	style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
 >
 	<span class="plotly-status" aria-live="polite">Loading figure…</span>
 </div>
 
 <script>
-	import { PALETTE_SIZE, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { COMPACT_QUERY, PALETTE_SIZE, compactFigure, hasControls, movableTitle, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
 
 	type Layout = Record<string, any>;
 
 	const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+	// A phone: the figure is laid out compact (and its frame is taller, in the CSS below); on a
+	// touch screen a drag scrolls the page instead of zooming, and the toolbar, which a mouse
+	// would show on hover, is hidden.
+	const compact = matchMedia(COMPACT_QUERY);
+	const touch = matchMedia('(pointer: coarse)');
+	const config = (thumbnail: boolean) => ({
+		responsive: true,
+		displaylogo: false,
+		staticPlot: thumbnail,
+		displayModeBar: touch.matches ? false : 'hover',
+		scrollZoom: false,
+	});
 
 	const palette = () =>
 		Array.from({ length: PALETTE_SIZE }, (_, i) => css(`--mm-data-${i + 1}`)).filter(Boolean);
@@ -122,10 +135,25 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 			border: css('--sl-color-hairline-light'),
 			active: css('--sl-color-accent'),
 		});
-		return { data: figure.data, layout: controls, frames: thumbnail ? [] : figure.frames };
+		if (!thumbnail && touch.matches) controls.dragmode = false;
+		const shown = { data: figure.data, layout: controls, frames: thumbnail ? [] : figure.frames };
+		return !thumbnail && compact.matches ? compactFigure(shown) : shown;
 	}
 
 	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any }[] = [];
+
+	// On a phone the title of the figure is text above the plot, where it wraps (see movableTitle).
+	function syncCaption(plot: HTMLElement, figure: Figure, thumbnail: boolean) {
+		const text = !thumbnail && compact.matches ? movableTitle(figure) : '';
+		let caption = plot.previousElementSibling as HTMLElement | null;
+		if (!text) return caption?.remove();
+		if (!caption) {
+			caption = document.createElement('div');
+			caption.className = 'plotly-caption';
+			plot.before(caption);
+		}
+		caption.textContent = text;
+	}
 
 	async function render(element: HTMLElement) {
 		const thumbnail = element.hasAttribute('data-thumbnail');
@@ -142,21 +170,19 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 			const Plotly = module.default ?? (typeof module.newPlot === 'function' ? module : (window as any).Plotly);
 			const hints = webHints(figure);
 			if (!thumbnail && !element.classList.contains('has-aspect') && typeof hints.aspect === 'number' && hints.aspect > 0) {
-				element.style.aspectRatio = String(hints.aspect);
+				element.style.setProperty('--aspect', String(hints.aspect));
 				element.classList.add('has-aspect');
 			}
+			if (hasControls(figure)) element.classList.add('has-controls');
 			if (!element.hasAttribute('aria-label') && (hints.alt || hints.title)) element.setAttribute('aria-label', (hints.alt || hints.title)!);
 			// plotted into an inner box: Plotly sizes a plot to the border box of its element, which
 			// would overflow the padding of the frame
 			const plot = document.createElement('div');
-			plot.style.width = '100%';
-			plot.style.height = '100%';
+			plot.className = 'plotly-plot';
 			element.replaceChildren(plot);
-			await Plotly.newPlot(plot, themed(figure, thumbnail), {
-				responsive: true,
-				displaylogo: false,
-				staticPlot: thumbnail,
-			});
+			syncCaption(plot, figure, thumbnail);
+			// with a figure object, Plotly reads the config from the object, not from a third argument
+			await Plotly.newPlot(plot, { ...themed(figure, thumbnail), config: config(thumbnail) });
 			rendered.push({ element: plot, figure, thumbnail, Plotly });
 		} catch (error) {
 			element.textContent = `Could not load the figure (${(error as Error).message}).`;
@@ -175,14 +201,22 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 	);
 	document.querySelectorAll<HTMLElement>('[data-plotly]').forEach((element) => observer.observe(element));
 
-	// the theme toggle sets data-theme on <html>
-	new MutationObserver(() => {
-		for (const { element, figure, thumbnail, Plotly } of rendered) Plotly.react(element, themed(figure, thumbnail));
-	}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+	const redraw = () => {
+		for (const { element, figure, thumbnail, Plotly } of rendered) {
+			syncCaption(element, figure, thumbnail);
+			Plotly.react(element, { ...themed(figure, thumbnail), config: config(thumbnail) });
+		}
+	};
+	// the theme toggle sets data-theme on <html>; a phone turned sideways can leave the compact width
+	new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+	compact.addEventListener('change', redraw);
+	touch.addEventListener('change', redraw);
 </script>
 
 <style>
 	.plotly-figure {
+		display: flex;
+		flex-direction: column;
 		min-height: 24rem;
 		margin-block: 1.25rem;
 		border: 1px solid var(--sl-color-hairline);
@@ -191,7 +225,23 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 		background: color-mix(in srgb, var(--sl-color-gray-5, #888) 8%, transparent);
 	}
 	.plotly-figure.has-aspect {
+		aspect-ratio: var(--aspect);
 		min-height: 12rem;
+	}
+	/* a phone (COMPACT_QUERY in lib/plotly-theme.ts): at most 1.3 times as wide as tall, and at
+	   most 0.85 with a slider or buttons, so that the plot keeps a usable height */
+	@media (max-width: 40rem) {
+		.plotly-figure {
+			min-height: 20rem;
+			padding: 0.25rem;
+		}
+		.plotly-figure.has-aspect {
+			aspect-ratio: min(var(--aspect), 1.3);
+			min-height: 16rem;
+		}
+		.plotly-figure.has-aspect.has-controls {
+			aspect-ratio: min(var(--aspect), 0.85);
+		}
 	}
 	.plotly-figure.thumbnail {
 		min-height: 0;
@@ -203,6 +253,18 @@ const { src, thumbnail = false, alt, aspect } = Astro.props;
 		padding: 0;
 		background: none;
 		pointer-events: none;
+	}
+	/* the plot and, on a phone, the title above it; created by the script, hence :global */
+	.plotly-figure :global(.plotly-plot) {
+		flex: 1 1 auto;
+		min-height: 0;
+		width: 100%;
+	}
+	.plotly-figure :global(.plotly-caption) {
+		padding: 0.5rem 0.5rem 0;
+		font-weight: 600;
+		line-height: 1.3;
+		text-align: center;
 	}
 	.plotly-status {
 		color: var(--sl-color-gray-3);
