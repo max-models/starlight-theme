@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { colorSlot, compactFigure, hasControls, isBlack, movableTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, isBlack, isWhite, movableTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -184,5 +184,61 @@ describe('compactFigure with an animation', () => {
 		// a slider in a row of its own stays
 		const alone = compactFigure({ layout: { updatemenus: [{ x: 0, y: 1.1 }], sliders: [{ x: 0.1, y: 0 }] } }).layout!;
 		expect(alone.sliders[0]).toEqual({ x: 0.1, y: 0 });
+	});
+});
+
+describe('ink and paper', () => {
+	it('maps black to the text colour and white to the background', () => {
+		expect(isWhite('white') && isWhite('#FFF') && isWhite('rgba(255, 255, 255, 0.5)')).toBe(true);
+		expect(isWhite('#fffffe')).toBe(false);
+		expect(inkAndPaper('black', '#eee', '#012')).toBe('#eee');
+		expect(inkAndPaper('rgba(255,255,255,0.5)', '#eee', '#001122')).toBe('rgba(0, 17, 34, 0.5)');
+		expect(inkAndPaper('#ff0000', '#eee', '#012')).toBe('#ff0000');
+		expect(inkAndPaper('white', '#eee')).toBe('white'); // no paper given
+	});
+
+	it('recolours white lines, marker edges and text of a trace', () => {
+		const trace = { line: { color: 'white' }, marker: { color: '#1f77b4', line: { color: 'black', width: 1 } }, textfont: { color: 'black' } };
+		const out = recolorTrace(trace, palette, '#eee', '#012');
+		expect(out.line.color).toBe('#012');
+		expect(out.marker).toEqual({ color: '#1f77b4', line: { color: '#eee', width: 1 } });
+		expect(out.textfont.color).toBe('#eee');
+		// a slotted trace takes its palette colour, its edges still ink and paper
+		const slotted = recolorTrace({ meta: { color_slot: 0 }, marker: { color: '#1f77b4', line: { color: 'white' } } }, palette, '#eee', '#012');
+		expect(slotted.marker).toEqual({ color: '#111111', line: { color: '#012' } });
+	});
+});
+
+describe('calmLayout', () => {
+	const colors = { text: '#eee', muted: '#999', line: '#444', grid: '#222', background: '#012', hover: '#123', font: 'system-ui' };
+
+	it('draws the axes without a box, with quiet ticks and light grid lines', () => {
+		const layout = {
+			xaxis: { mirror: true, linecolor: 'black', ticks: 'outside', ticklen: 8, title: { text: 't', font: { size: 14 } } },
+			yaxis2: { mirror: 'ticks', tickfont: { size: 10 }, title: 'E' },
+			scene: { xaxis: {} },
+		};
+		const out = calmLayout(layout, colors);
+		expect(out.xaxis).toEqual({
+			mirror: false, linecolor: '#444', tickcolor: '#444', gridcolor: '#222', zerolinecolor: '#444',
+			ticks: 'outside', ticklen: 4, tickfont: { color: '#999' }, title: { text: 't', font: { size: 14, color: '#eee' } },
+		});
+		expect(out.yaxis2).toMatchObject({ mirror: false, tickfont: { size: 10, color: '#999' }, title: 'E' });
+		expect(out.yaxis2).not.toHaveProperty('ticklen');
+		expect(out.scene).toBe(layout.scene);
+		expect(out.hoverlabel).toEqual({ bgcolor: '#123', bordercolor: '#444', font: { color: '#eee', family: 'system-ui' } });
+	});
+
+	it('gives annotations and shapes ink and paper', () => {
+		const layout = {
+			annotations: [{ text: 'a', font: { color: 'black', size: 9 }, arrowcolor: 'black', bgcolor: 'white' }, { text: 'b' }],
+			shapes: [{ type: 'line', line: { color: 'rgba(0,0,0,0.5)', dash: 'dot' } }, { type: 'rect', fillcolor: 'white' }, { type: 'rect', fillcolor: '#ff0000' }],
+		};
+		const out = calmLayout(layout, colors);
+		expect(out.annotations[0]).toEqual({ text: 'a', font: { color: '#eee', size: 9 }, arrowcolor: '#eee', bgcolor: '#012' });
+		expect(out.annotations[1]).toEqual({ text: 'b' });
+		expect(out.shapes[0].line).toEqual({ color: 'rgba(238, 238, 238, 0.5)', dash: 'dot' });
+		expect(out.shapes[1].fillcolor).toBe('#012');
+		expect(out.shapes[2].fillcolor).toBe('#ff0000');
 	});
 });
