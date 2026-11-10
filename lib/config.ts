@@ -164,6 +164,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			citation: readCitation(root),
 			license: readLicense(root, github, sourceBranch),
 			shareImage: options.shareImage,
+			math: options.math,
 		}),
 	];
 	if (pkg) {
