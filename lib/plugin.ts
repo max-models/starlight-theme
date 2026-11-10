@@ -67,6 +67,8 @@ export interface ThemeOptions {
 	license?: License;
 	/** A share image of the site (`<base>/og.png`, the header picture with the title) for link previews. Default true. */
 	shareImage?: boolean;
+	/** The KaTeX macros of the site (`math.macros` of defineDocs), also for the formulas in Plotly figures. */
+	math?: { macros?: Record<string, string> };
 }
 
 /** What `virtual:starlight-theme/config` exports. */
@@ -87,6 +89,8 @@ export interface ThemeConfig {
 	family: { name: string; href: string };
 	/** Title and description of the site, for the share image (set from the Starlight config). */
 	site: { title: string; description: string };
+	/** The KaTeX macros, for the formulas of PlotlyFigure (typeset with MathJax). */
+	math: { macros: Record<string, string> };
 }
 
 const VIRTUAL_ID = 'virtual:starlight-theme/config';
@@ -125,6 +129,7 @@ export function themeConfig(options: ThemeOptions): ThemeConfig {
 		license: options.license ?? null,
 		family: { name: `${owner} projects`, href: `https://${owner}.github.io/` },
 		site: { title: '', description: '' },
+		math: { macros: options.math?.macros ?? {} },
 	};
 }
 
