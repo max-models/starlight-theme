@@ -57,12 +57,15 @@ describe('citationOf', () => {
 
 describe('readLicense', () => {
 	it('takes the name from CITATION.cff, pyproject.toml or the license file', () => {
-		const github = 'https://github.com/max-models/x';
+		const github = { url: 'https://github.com/max-models/x', host: 'github' as const, label: 'GitHub' };
 		const root = mkdtempSync(join(tmpdir(), 'license-'));
 		expect(readLicense(root, github, 'devel')).toBeUndefined();
 		expect(readCitation(root)).toBeUndefined();
 		writeFileSync(join(root, 'LICENSE.txt'), 'MIT License\n\nCopyright (c) 2026\n');
-		expect(readLicense(root, github, 'devel')).toEqual({ name: 'MIT', href: `${github}/blob/devel/LICENSE.txt` });
+		expect(readLicense(root, github, 'devel')).toEqual({ name: 'MIT', href: `${github.url}/blob/devel/LICENSE.txt` });
+		const gitlab = { url: 'https://gitlab.example.org/group/x', host: 'gitlab' as const, label: 'GitLab' };
+		expect(readLicense(root, gitlab, 'main')?.href).toBe('https://gitlab.example.org/group/x/-/blob/main/LICENSE.txt');
+		expect(readLicense(root, null, 'main')).toEqual({ name: 'MIT' });
 		writeFileSync(join(root, 'pyproject.toml'), '[project]\nname = "x"\nlicense = "BSD-3-Clause"\n');
 		expect(readLicense(root, github, 'main')?.name).toBe('BSD-3-Clause');
 		writeFileSync(join(root, 'CITATION.cff'), software);

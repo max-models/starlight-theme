@@ -85,6 +85,7 @@ Other options:
 | Option | |
 |---|---|
 | `owner`, `branch` | GitHub owner (default `max-models`) and the branch of the edit and source links (default `devel`) |
+| `source` | Where the source lives, when not on GitHub: `{ url: 'https://gitlab.example.org/group/repo' }` points the "Source on ..." and "View on ..." links, the edit, license and CITATION.cff links, the social icon and the API reference's source links there (`host` `'github'` or `'gitlab'`, guessed from the URL; `label`, the name in "Source on <label>"). Colab, Binder and the GitHub release badge need github.com: elsewhere the launch buttons are left out and the badge comes only from PyPI (`release: { pypi }`). `false` for no source links |
 | `pydocs` | Overrides for the starlight-pydocs package entry |
 | `inventories` | Sphinx inventories for the API reference (default Python and NumPy) |
 | `crossref` | Sibling projects whose API reference the annotations link to, e.g. `['mpiarray']`. Default: the max-models projects among the dependencies of `pyproject` (`../pyproject.toml`); `false` for none |
