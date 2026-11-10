@@ -91,7 +91,7 @@ Other options:
 | `projects` | The "Projects" menu of the header: by default loaded in the browser from `projectsUrl`, with the list in `lib/projects.ts` until it loads; a list of the site's own (not loaded), or `false` to hide it |
 | `projectsUrl` | The JSON list the menu loads, default `https://max-models.github.io/projects.json`; `false` keeps the built-in list |
 | `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
-| `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page |
+| `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page, also in the formulas of Plotly figures |
 | `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; without one the title has the max-models wave before it, `false` for neither. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
 | `release` | The badge of the latest release in the hero: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
 | `methodcard` | `true` or `{ title, exclude }`: the [method cards](#method-cards) of the package, on its API pages and a catalogue page |
@@ -394,6 +394,14 @@ page, e.g. converted from Matplotlib, reads in dark mode too.
 On a phone the figure is laid out compact: taller than on a desktop, the legend in a row at the
 top, a fixed title as text above it, small margins and room for an animation's controls. On a
 touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
+
+**Formulas.** A label that is one formula, `$...$`, is typeset as LaTeX: in titles, axis titles,
+legends, annotations and colour bars (plotly.js does not typeset hover labels). Text in a formula
+goes in `\text{...}`, e.g. `$\sigma_s\text{ [m}^2\text{]}$`: plotly.js takes the whole label as
+one formula. The component loads MathJax 3 (TeX to SVG, about 680 kB compressed) with the first
+figure on a page that has a formula, so other pages load nothing more; the KaTeX macros of the
+site (`math.macros`) apply to the figures too. plasma-plots writes its labels this way with
+`plasma_plots.set_math("latex")`.
 
 **Web figures.** maxplotlib writes figures for this component, from a maxplotlib `Canvas` or any
 Plotly figure: `canvas.savefig("docs/public/figures/waves.plotly.json", backend="plotly")` or

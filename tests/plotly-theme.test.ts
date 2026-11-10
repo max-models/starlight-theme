@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, isBlack, isWhite, movableTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, isBlack, isWhite, movableTitle, movableYTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -120,7 +120,8 @@ describe('compactFigure', () => {
 		const out = compactFigure(figure);
 		const layout = out.layout!;
 		expect(layout.legend).toEqual({ x: 0, y: 1, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'top', yref: 'container' });
-		expect(layout.margin).toEqual({ l: 56, r: 12, t: 16, b: 64, pad: 0 });
+		// the one y axis's title is shown above the plot: no room for it at the left
+		expect(layout.margin).toEqual({ l: 16, r: 12, t: 16, b: 64, pad: 0 });
 		expect(layout.title).toEqual({ text: '' }); // shown above the figure instead
 		expect(layout.font.size).toBe(12);
 		expect(layout.coloraxis.colorbar.thickness).toBe(10);
@@ -133,7 +134,7 @@ describe('compactFigure', () => {
 	it('gives the axes automargin, a title standoff and fewer x ticks', () => {
 		const layout = compactFigure(figure).layout!;
 		expect(layout.xaxis).toEqual({ title: { text: 't', standoff: 6 }, automargin: true, nticks: 6 });
-		expect(layout.yaxis).toEqual({ title: { text: 'E', standoff: 12 }, tickvals: [0, 1], automargin: true });
+		expect(layout.yaxis).toEqual({ title: { text: '' }, tickvals: [0, 1], automargin: true }); // above the plot
 		expect(layout.xaxis2).toEqual({ tickvals: [0, 1], automargin: true });
 	});
 
@@ -168,6 +169,24 @@ describe('movableTitle', () => {
 		const movie = { layout: { title: 't = 0' }, frames: [{ layout: { title: 't = 1' } }] };
 		expect(movableTitle(movie)).toBe('');
 		expect(compactFigure(movie).layout!.title).toBe('t = 0');
+	});
+});
+
+describe('movableYTitle', () => {
+	it('moves the one y axis title above a phone\'s plot', () => {
+		const figure = { layout: { xaxis: { title: { text: 'x' } }, yaxis: { title: { text: '$p\\text{ [W m}^{-3}\\text{]}$' } } } };
+		expect(movableYTitle(figure)).toBe('$p\\text{ [W m}^{-3}\\text{]}$');
+		const out = compactFigure(figure).layout!;
+		expect(out.yaxis.title).toEqual({ text: '' });
+		expect(out.xaxis.title.text).toBe('x');
+		expect(out.margin.l).toBe(16);
+	});
+
+	it('leaves twin axes, panels and scenes as they are', () => {
+		expect(movableYTitle({ layout: { yaxis: { title: 'a' }, yaxis2: { title: 'b' } } })).toBe('');
+		expect(movableYTitle({ layout: { yaxis: { title: 'a' }, scene: {} } })).toBe('');
+		expect(movableYTitle({ layout: { yaxis: {} } })).toBe('');
+		expect(compactFigure({ layout: { yaxis: { title: 'a' }, yaxis2: { title: 'b' } } }).layout!.margin.l).toBe(56);
 	});
 });
 

@@ -5,6 +5,9 @@
 // grid and backgrounds, the data palette (--mm-data-1..8 in styles/theme.css) for the traces in
 // a default colour, and the text colour for black ones. A web figure (maxplotlib.web, `*.plotly.json`) adds hints in
 // layout.meta.web: its aspect ratio, a text alternative and a white plot area (see the README).
+// Labels that are one `$...$` formula are typeset with MathJax, loaded with the first figure that
+// has one, with the site's KaTeX macros (lib/mathjax.ts).
+import config from 'virtual:starlight-theme/config';
 import { withBase } from '../utils/base';
 
 export interface Props {
@@ -30,6 +33,7 @@ const { src, thumbnail = false, alt, aspect, caption, poster, posterDark } = Ast
 const posterAlt = alt ?? caption ?? '';
 // a poster that cannot be loaded (e.g. not written by the build) leaves the "Loading" text
 const dropBroken = 'this.remove()';
+const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(config.math!.macros) : undefined;
 ---
 
 <figure class:list={['plotly-wrap', { thumbnail }]} aria-label={alt}>
@@ -37,6 +41,7 @@ const dropBroken = 'this.remove()';
 		class:list={['plotly-figure', { thumbnail, 'has-aspect': !thumbnail && aspect, 'has-poster': poster }]}
 		data-plotly={withBase(src)}
 		data-thumbnail={thumbnail ? '' : undefined}
+		data-math-macros={macros}
 		style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
 	>
 		{poster && (
@@ -58,7 +63,11 @@ const dropBroken = 'this.remove()';
 </figure>
 
 <script>
-	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, movableTitle, paletteFigure, themeControls, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { captionParts, formulaOf, hasMath, mathjaxConfig } from '../lib/mathjax.ts';
+	// MathJax 3 (TeX to SVG), served as a file of its own: a classic script that sets window.MathJax
+	// @ts-ignore: a URL import
+	import mathjaxUrl from 'mathjax/es5/tex-svg.js?url';
 
 	type Layout = Record<string, any>;
 
@@ -182,17 +191,68 @@ const dropBroken = 'this.remove()';
 
 	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any }[] = [];
 
-	// On a phone the title of the figure is text above the plot, where it wraps (see movableTitle).
+	// MathJax, once per page, for the figures with formulas; plotly.js finds it as window.MathJax
+	let mathjax: Promise<any> | null = null;
+	function loadMathJax(macros: Record<string, string>): Promise<any> {
+		const global = window as any;
+		mathjax ??= new Promise((resolve, reject) => {
+			if (global.MathJax?.startup?.promise) return resolve(global.MathJax.startup.promise);
+			global.MathJax = mathjaxConfig(macros, css('--sl-font') || 'system-ui, sans-serif');
+			const script = document.createElement('script');
+			script.src = mathjaxUrl;
+			script.async = true;
+			script.onload = () =>
+				resolve(
+					global.MathJax.startup.promise.then(() => {
+						// the styles of MathJax's output (and its hidden copy for screen readers), which
+						// the page gets only from a typeset of the page, which KaTeX does here
+						document.head.append(global.MathJax.svgStylesheet());
+					})
+				);
+			script.onerror = () => reject(new Error('MathJax could not be loaded'));
+			document.head.append(script);
+		}).then(() => global.MathJax);
+		return mathjax;
+	}
+
+	// a label as text: typeset when it is a formula and MathJax is loaded, else with its sub- and
+	// superscripts (Plotly's markup)
+	function setText(target: HTMLElement, text: string) {
+		const tex = formulaOf(text);
+		const MathJax = (window as any).MathJax;
+		if (tex && MathJax?.tex2svg) return target.replaceChildren(MathJax.tex2svg(tex, { display: false }));
+		target.replaceChildren(
+			...captionParts(text).map(({ tag, text }) => {
+				if (!tag) return document.createTextNode(text);
+				const element = document.createElement(tag);
+				element.textContent = text;
+				return element;
+			})
+		);
+	}
+
+	// On a phone the title of the figure and the title of its y axis are text above the plot, where
+	// they wrap (see movableTitle and movableYTitle).
 	function syncCaption(plot: HTMLElement, figure: Figure, thumbnail: boolean) {
-		const text = !thumbnail && compact.matches ? movableTitle(figure) : '';
+		const shown = !thumbnail && compact.matches;
+		const title = shown && movableTitle(figure) ? titleText(figure.layout?.title) : '';
+		const yTitle = shown ? movableYTitle(figure) : '';
 		let caption = plot.previousElementSibling as HTMLElement | null;
-		if (!text) return caption?.remove();
+		if (!title && !yTitle) return caption?.remove();
 		if (!caption) {
 			caption = document.createElement('div');
 			caption.className = 'plotly-caption';
 			plot.before(caption);
 		}
-		caption.textContent = text;
+		const lines: HTMLElement[] = [];
+		for (const [text, className] of [[title, 'plotly-caption-title'], [yTitle, 'plotly-caption-axis']]) {
+			if (!text) continue;
+			const line = document.createElement('div');
+			line.className = className;
+			setText(line, text);
+			lines.push(line);
+		}
+		caption.replaceChildren(...lines);
 	}
 
 	async function render(element: HTMLElement) {
@@ -205,6 +265,10 @@ const dropBroken = 'this.remove()';
 			]);
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 			const figure: Figure = await response.json();
+			// a thumbnail shows no labels: no MathJax for it
+			if (!thumbnail && hasMath(figure)) {
+				await loadMathJax(JSON.parse(element.dataset.mathMacros ?? '{}')).catch(() => null); // without it, the labels as written
+			}
 			// plotly.js is a UMD build: bundled, it is the module's default export; served as is (the
 			// dev server of a site that installs the theme), it only sets window.Plotly
 			const Plotly = module.default ?? (typeof module.newPlot === 'function' ? module : (window as any).Plotly);
@@ -316,9 +380,17 @@ const dropBroken = 'this.remove()';
 	}
 	.plotly-figure :global(.plotly-caption) {
 		padding: 0.5rem 0.5rem 0;
-		font-weight: 600;
 		line-height: 1.3;
+	}
+	.plotly-figure :global(.plotly-caption-title) {
+		font-weight: 600;
 		text-align: center;
+	}
+	/* the y axis's title, above the axis as web charts on phones show it */
+	.plotly-figure :global(.plotly-caption-axis) {
+		margin-top: 0.25rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-xs);
 	}
 	.plotly-poster {
 		flex: 1 1 auto;

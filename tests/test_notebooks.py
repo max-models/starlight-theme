@@ -309,6 +309,49 @@ def test_plotly_figure(project, monkeypatch):
     assert json.loads((public / "1.plotly.json").read_text()) == spec
 
 
+def test_grid_thumbnail_of_a_plotly_figure(project, monkeypatch):
+    """A notebook whose figures are Plotly outputs has its first one as the card's picture."""
+    v4 = nbformat.v4
+    guides = project / "guides"
+    write_notebook(
+        guides / "index.ipynb",
+        [
+            v4.new_markdown_cell("# Guides"),
+            v4.new_markdown_cell("The list:", metadata={"tags": ["notebook-grid"]}),
+        ],
+    )
+    spec = {"data": [{"type": "scatter", "x": [0, 1], "y": [1, 2]}], "layout": {}}
+    cells = [
+        v4.new_markdown_cell("# Interactive\n\nOnly Plotly figures."),
+        v4.new_code_cell(
+            "fig.show()",
+            outputs=[
+                v4.new_output(
+                    "display_data", data={"application/vnd.plotly.v1+json": spec}
+                )
+            ],
+        ),
+        v4.new_code_cell(
+            "plot()",
+            outputs=[v4.new_output("display_data", data={"image/png": PNG})],
+        ),
+    ]
+    write_notebook(guides / "interactive.ipynb", cells)
+    cache = project / "docs" / ".cache" / "notebooks"
+    cache.mkdir(parents=True)
+    write_notebook(cache / "interactive.ipynb", cells)
+    run(project, "convert", monkeypatch=monkeypatch)
+    page = (
+        project / "docs" / "src" / "content" / "docs" / "guides" / "index.mdx"
+    ).read_text()
+    (item,) = _grid_items(page)
+    # the first figure, the Plotly one, drawn as a thumbnail by PlotlyFigure
+    assert item["thumbnail"] == {
+        "kind": "plotly",
+        "src": "/guides/interactive/1.plotly.json",
+    }
+
+
 def test_pyvista_scene_without_picture(project, monkeypatch):
     v4 = nbformat.v4
     cells = [

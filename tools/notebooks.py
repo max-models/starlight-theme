@@ -425,7 +425,7 @@ class Page:
         self.title = ""
         self.description = ""
         self.order = 0
-        self.thumbnail: str | None = None  # the first image output, for the grid
+        self.thumbnail: dict | None = None  # the first figure output, for the grid
 
     def asset(self, suffix: str) -> tuple[Path, str]:
         self.assets += 1
@@ -481,7 +481,7 @@ def convert_scene(data: dict, scene: dict, page: Page) -> str:
     if "image/png" in data:  # <n>.png, and the scene next to it as <n>.html
         image, image_url = page.asset(".png")
         image.write_bytes(base64.b64decode(_text(data["image/png"])))
-        page.thumbnail = page.thumbnail or image_url
+        page.thumbnail = page.thumbnail or {"kind": "png", "src": image_url}
         path, url = image.with_suffix(".html"), image_url.removesuffix(".png") + ".html"
     else:
         path, url = page.asset(".html")
@@ -508,6 +508,7 @@ def convert_plotly(data: dict, figure: dict, page: Page) -> str:
         spec = json.loads(_text(spec))
     path, url = page.asset(".plotly.json")
     path.write_text(json.dumps(spec, separators=(",", ":")), encoding="utf-8")
+    page.thumbnail = page.thumbnail or {"kind": "plotly", "src": url}
     page.components.add("PlotlyFigure")
     tag = f'<PlotlyFigure src="{url}" />'
     if figure.get("title"):
@@ -535,7 +536,7 @@ def convert_output(output: dict, page: Page, tags: list[str], index: int) -> str
     if mime is not None:  # a GIF is an animation, e.g. from IPython.display.Image
         path, url = page.asset(_IMAGES[mime])
         path.write_bytes(base64.b64decode(_text(data[mime])))
-        page.thumbnail = page.thumbnail or url
+        page.thumbnail = page.thumbnail or {"kind": "png", "src": url}
         page.components.add("NotebookImage")
         return f'<NotebookImage src="{url}" />'
     if "image/svg+xml" in data:
@@ -568,7 +569,7 @@ def grid_card(settings: Settings, source: Path, page: Page, executed: bool) -> d
         "summary": page.description,
         "href": f"/{settings.section}/{page.slug}/",
         "group": group_of(settings.source, source),
-        "thumbnail": {"kind": "png", "src": page.thumbnail} if page.thumbnail else None,
+        "thumbnail": page.thumbnail,
         "placeholder": "" if executed else "not run",
     }
 
