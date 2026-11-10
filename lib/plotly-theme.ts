@@ -174,7 +174,7 @@ export const COMPACT_QUERY = '(max-width: 40rem)';
 
 const CARTESIAN_AXIS = /^[xy]axis\d*$/;
 
-function titleText(title: unknown): string {
+export function titleText(title: unknown): string {
 	if (typeof title === 'string') return title;
 	if (title && typeof title === 'object' && typeof (title as any).text === 'string') return (title as any).text;
 	return '';
@@ -200,6 +200,9 @@ export function compactFigure(figure: Figure): Figure {
 	const margin = layout.margin ?? {};
 	const controls = hasControls(figure);
 	const title = movableTitle(figure);
+	// the y axis's title, shown above the plot as text (see movableYTitle): along the axis, a long
+	// one is longer than a phone's plot is high
+	const yTitle = movableYTitle(figure);
 	// buttons in the slider's row (Play and Pause beside it) cover its start on a narrow screen:
 	// the slider moves to a row of its own below them
 	const menus: Record<string, any>[] = Array.isArray(layout.updatemenus) ? layout.updatemenus : [];
@@ -210,7 +213,7 @@ export function compactFigure(figure: Figure): Figure {
 	const cap = (value: unknown, max: number) => Math.min(typeof value === 'number' ? value : max, max);
 	out.margin = {
 		...margin,
-		l: cap(margin.l, titled('y') ? 56 : 16),
+		l: cap(margin.l, titled('y') && !yTitle ? 56 : 16),
 		r: cap(margin.r, 12),
 		// the buttons (above the plot) and the slider (below it) of an animation sit in the
 		// margins, and Plotly does not make room for a slider: 150 px fit it with its labels
@@ -220,6 +223,7 @@ export function compactFigure(figure: Figure): Figure {
 	};
 	for (const key of axes) {
 		const axis = { ...layout[key], automargin: true };
+		if (yTitle && key.startsWith('y')) axis.title = { text: '' };
 		const text = titleText(axis.title);
 		// without a standoff Plotly pins an automargin axis's title to the edge of the figure
 		if (text) axis.title = { ...(typeof axis.title === 'object' ? axis.title : { text }), standoff: axis.title?.standoff ?? 6 };
@@ -262,6 +266,20 @@ export function movableTitle(figure: Figure): string {
 		.replace(/<br\s*\/?>/gi, ' ')
 		.replace(/<[^>]+>/g, '')
 		.trim();
+}
+
+/**
+ * The title of a figure's y axis that a narrow screen shows as text above the plot, where it can
+ * wrap, instead of along the axis: the title of the figure's one y axis (none for twin axes,
+ * several panels or 3D scenes, whose titles stay where they are), as written (markup and
+ * formulas included).
+ */
+export function movableYTitle(figure: Figure): string {
+	const layout = figure.layout ?? {};
+	if (Object.keys(layout).some((key) => /^scene\d*$/.test(key))) return '';
+	const yAxes = Object.keys(layout).filter((key) => /^yaxis\d*$/.test(key));
+	if (yAxes.length !== 1 || yAxes[0] !== 'yaxis') return '';
+	return titleText(layout.yaxis?.title).trim();
 }
 
 /** Whether a figure has controls below or above the plot: a slider or buttons (an animation). */
