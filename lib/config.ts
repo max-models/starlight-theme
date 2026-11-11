@@ -35,6 +35,7 @@ import theme, { type LaunchService, type NavLink, type Versions } from './plugin
 import { dependencyProjects, inventoryUrl, projects as defaultProjects, type Project } from './projects.ts';
 import { remarkDarkImages } from './dark-images.ts';
 import { rehypeRebase } from './rebase.ts';
+import { blobUrl, editUrl, pydocsSourceLink, resolveSource, type SourceOptions } from './source.ts';
 
 type Sidebar = NonNullable<StarlightUserConfig['sidebar']>;
 type RehypePlugins = NonNullable<NonNullable<Parameters<typeof unified>[0]>['rehypePlugins']>;
@@ -46,6 +47,13 @@ export interface DocsOptions {
 	owner?: string;
 	/** Branch for "Edit page" and source links. Default "devel". */
 	branch?: string;
+	/**
+	 * Where the source lives, for the source, edit, license and CITATION.cff links, the social icon
+	 * and the API reference's source links: by default github.com/<owner>/<repo>; another forge with
+	 * `{ url: 'https://gitlab.example.org/group/repo' }` (`host` "github" or "gitlab", guessed from
+	 * the URL, and `label` for "Source on <label>"); `false` for no source links.
+	 */
+	source?: SourceOptions | false;
 	title: string;
 	description: string;
 	/** Links in the header (see `NavLink`). */
@@ -143,7 +151,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	const base = versions?.current === 'dev' ? `/${options.repo}/dev` : `/${options.repo}`;
 	// the stable build shows the sources of the release it documents
 	const sourceBranch = versions?.current === 'stable' ? (process.env.DOCS_STABLE_BRANCH || 'main') : branch;
-	const github = `https://github.com/${owner}/${options.repo}`;
+	const source = resolveSource(options.source, `${owner}/${options.repo}`);
 	const pkg = options.pythonPackage;
 	const pyproject = resolve(options.pyproject ?? '../pyproject.toml');
 	const root = dirname(pyproject);
@@ -153,6 +161,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 	const plugins: NonNullable<StarlightUserConfig['plugins']> = [
 		theme({
 			repository: `${owner}/${options.repo}`,
+			source: options.source,
 			branch: sourceBranch,
 			nav: options.nav,
 			versions,
@@ -162,7 +171,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			release: options.release,
 			logo: options.logo !== false,
 			citation: readCitation(root),
-			license: readLicense(root, github, sourceBranch),
+			license: readLicense(root, source, sourceBranch),
 			shareImage: options.shareImage,
 			math: options.math,
 		}),
@@ -180,7 +189,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 						label: 'All modules',
 						search: ['../src'],
 						docstringStyle: 'google',
-						sourceLink: { host: 'github', repo: `${owner}/${options.repo}`, ref: sourceBranch, root: '..' },
+						sourceLink: pydocsSourceLink(source, sourceBranch, '..'),
 						sidebar: { collapsed: true },
 						...options.pydocs,
 						// methodcard's griffe extension adds the "Numerics" sections, after the site's own
@@ -226,7 +235,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			cards,
 			macros: options.math?.macros ?? {},
 			base,
-			source: `${github}/blob/${sourceBranch}/${relative(gitRoot(root), resolve(search)).split(sep).join('/')}/`,
+			source: source ? blobUrl(source, sourceBranch, `${relative(gitRoot(root), resolve(search)).split(sep).join('/')}/`) : '',
 			pages: methodcard.pages ?? false,
 			index: methodcard.index ?? true,
 			modules: cardModules(cards, methodcard.labels),
@@ -272,9 +281,9 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			starlight({
 				title: options.title,
 				description: options.description,
-				social: [{ icon: 'github', label: 'GitHub', href: github }],
+				social: source ? [{ icon: source.host, label: source.label, href: source.url }] : [],
 				...(options.logo ? { logo: options.logo } : {}),
-				editLink: { baseUrl: `${github}/edit/${branch}/docs/` },
+				editLink: source ? { baseUrl: editUrl(source, branch, 'docs/') } : {},
 				lastUpdated: true,
 				sidebar,
 				...starlightOverrides,

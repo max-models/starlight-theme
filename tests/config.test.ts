@@ -78,6 +78,23 @@ describe('defineDocs', () => {
 		expect(starlight.social[0].href).toBe('https://github.com/someone/simgeometry');
 	});
 
+	it('links the sources to another forge, or to none', () => {
+		const gitlab = build({ source: { url: 'https://gitlab.mpcdf.mpg.de/maxlin/resources' }, branch: 'main', pythonPackage: 'simgeometry' });
+		expect(gitlab.starlight.social).toEqual([{ icon: 'gitlab', label: 'GitLab', href: 'https://gitlab.mpcdf.mpg.de/maxlin/resources' }]);
+		expect(gitlab.starlight.editLink.baseUrl).toBe('https://gitlab.mpcdf.mpg.de/maxlin/resources/-/edit/main/docs/');
+		expect(gitlab.pydocs.packages[0].sourceLink.template).toBe('https://gitlab.mpcdf.mpg.de/maxlin/resources/-/blob/{ref}/{path}#L{start}-{end}');
+		const setup = runTheme(gitlab.theme);
+		expect(setup.virtual.source).toEqual({ url: 'https://gitlab.mpcdf.mpg.de/maxlin/resources', host: 'gitlab', label: 'GitLab' });
+		expect(setup.virtual.github).toBeNull();
+		expect(setup.virtual.release).toEqual({ github: null, pypi: null });
+
+		const none = build({ source: false, pythonPackage: 'simgeometry' });
+		expect(none.starlight.social).toEqual([]);
+		expect(none.starlight.editLink).toEqual({});
+		expect(none.pydocs.packages[0].sourceLink).toBeUndefined();
+		expect(runTheme(none.theme).virtual.source).toBeNull();
+	});
+
 	it('appends the API reference unless the sidebar places it', () => {
 		const withPackage = build({ pythonPackage: 'simgeometry' });
 		expect(withPackage.starlight.sidebar.at(-1)).toEqual({ label: 'API reference', collapsed: true, items: ['PYDOCS'] });
@@ -273,6 +290,8 @@ describe('theme plugin', () => {
 		expect(setup.virtual.citation).toEqual(citation);
 		expect(setup.virtual.logo).toBe(true);
 		expect(setup.virtual.release).toEqual({ github: 'a/b', pypi: null });
+		expect(setup.virtual.source).toEqual({ url: 'https://github.com/a/b', host: 'github', label: 'GitHub' });
+		expect(setup.virtual.github).toBe('a/b');
 		expect(setup.virtual.family).toEqual({ name: 'a projects', href: 'https://a.github.io/' });
 		expect(runTheme(theme({ repository: 'a/b' }), { logo: { src: './logo.svg' } }).virtual.logo).toBe(false);
 		expect(runTheme(theme({ repository: 'a/b', release: { pypi: 'c' } })).virtual.release).toEqual({ github: 'a/b', pypi: 'c' });
