@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, isBlack, isWhite, movableTitle, movableYTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, legendEntries, isBlack, isWhite, movableTitle, movableYTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -116,10 +116,12 @@ describe('compactFigure', () => {
 		},
 	};
 
-	it('puts the legend above the plot and shrinks margins, font and colorbars', () => {
+	it('leaves the legend to the page and shrinks margins, font and colorbars', () => {
 		const out = compactFigure(figure);
 		const layout = out.layout!;
-		expect(layout.legend).toEqual({ x: 0, y: 1, font: { size: 9 }, orientation: 'h', xanchor: 'left', yanchor: 'top', yref: 'container' });
+		expect(layout.legend).toEqual(figure.layout.legend); // not drawn: no trace is listed in it
+		expect(out.data![1].showlegend).toBe(false); // listed below the plot instead
+		expect(out.data![0].showlegend).toBeUndefined(); // a heatmap has no legend entry
 		// the one y axis's title is shown above the plot: no room for it at the left
 		expect(layout.margin).toEqual({ l: 16, r: 12, t: 16, b: 64, pad: 0 });
 		expect(layout.title).toEqual({ text: '' }); // shown above the figure instead
@@ -127,7 +129,7 @@ describe('compactFigure', () => {
 		expect(layout.coloraxis.colorbar.thickness).toBe(10);
 		expect(out.data![0].colorbar).toEqual({ title: 'φ', thickness: 10, xpad: 4 });
 		expect(out.data![1].marker.colorbar.thickness).toBe(10);
-		expect(out.data![2]).toBe(figure.data[2]);
+		expect(out.data![2]).toEqual({ y: [1], showlegend: false });
 		expect(figure.layout.legend.x).toBe(1.02); // the input is unchanged
 	});
 
@@ -146,6 +148,40 @@ describe('compactFigure', () => {
 		const movie = compactFigure({ layout: { sliders: [{}], margin: { b: 60 } } }).layout!;
 		expect(movie.margin).toMatchObject({ t: 70, b: 150 });
 		expect(compactFigure({ layout: { updatemenus: [{}], margin: { t: 40, b: 200 } } }).layout!.margin).toMatchObject({ t: 40, b: 200 });
+	});
+});
+
+describe('legendEntries', () => {
+	it('lists the traces of the main legend, with their legend groups', () => {
+		const figure = {
+			data: [
+				{ name: 'a', legendgroup: 'g' },
+				{ name: 'b', legendgroup: 'g', showlegend: false },
+				{ name: 'c', legend: 'legend2' },
+				{ type: 'heatmap', name: 'h' },
+				{ type: 'heatmap', name: 'shown', showlegend: true },
+				{ name: 'gone', visible: false },
+				{ visible: 'legendonly' },
+			],
+			layout: { legend: { title: { text: ' Runs ' } } },
+		};
+		expect(legendEntries(figure)).toEqual({
+			title: 'Runs',
+			entries: [
+				{ trace: 0, name: 'a', group: [0, 1] },
+				{ trace: 4, name: 'shown', group: [4] },
+				{ trace: 6, name: 'trace 6', group: [6] },
+			],
+		});
+		const out = compactFigure(figure);
+		expect(out.data!.map((trace) => trace.showlegend)).toEqual([false, false, undefined, undefined, false, undefined, false]);
+	});
+
+	it('follows Plotly: no legend for one trace or when hidden, unless asked for', () => {
+		expect(legendEntries({ data: [{ name: 'a' }] }).entries).toEqual([]);
+		expect(legendEntries({ data: [{ name: 'a' }], layout: { showlegend: true } }).entries).toHaveLength(1);
+		expect(legendEntries({ data: [{}, {}], layout: { showlegend: false } })).toEqual({ title: '', entries: [] });
+		expect(legendEntries({})).toEqual({ title: '', entries: [] });
 	});
 });
 
@@ -225,6 +261,9 @@ describe('ink and paper', () => {
 		// a slotted trace takes its palette colour, its edges still ink and paper
 		const slotted = recolorTrace({ meta: { color_slot: 0 }, marker: { color: '#1f77b4', line: { color: 'white' } } }, palette, '#eee', '#012');
 		expect(slotted.marker).toEqual({ color: '#111111', line: { color: '#012' } });
+		// Matplotlib's edge in the marker's colour takes the palette colour with it
+		const edged = recolorTrace({ meta: { color_slot: 0 }, marker: { color: 'rgba(31, 119, 180, 1)', line: { color: 'rgba(31, 119, 180, 1)' } } }, palette);
+		expect(edged.marker).toEqual({ color: 'rgba(17, 17, 17, 1)', line: { color: 'rgba(17, 17, 17, 1)' } });
 	});
 });
 

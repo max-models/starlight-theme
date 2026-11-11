@@ -392,8 +392,10 @@ light grid lines, hover labels in the page's colours. Black takes the text colou
 page background ("ink and paper"), except for labels on a colour map, so a figure drawn for a white
 page, e.g. converted from Matplotlib, reads in dark mode too.
 
-On a phone the figure is laid out compact: taller than on a desktop, the legend in a row at the
-top, a fixed title as text above it, small margins and room for an animation's controls. On a
+On a phone the figure is laid out compact: taller than on a desktop, small margins, room for an
+animation's controls, and the titles and the legend as text around the plot: the title and the y
+axis's title above it, the legend below it (a tap on an item hides its traces). They add to the
+height of the figure instead of taking it from the plot, which keeps its aspect ratio. On a
 touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
 
 **Formulas.** A label that is one formula, `$...$`, is typeset as LaTeX: in titles, axis titles,

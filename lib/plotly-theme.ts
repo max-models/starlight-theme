@@ -100,9 +100,12 @@ export function recolorTrace(trace: Trace, palette: string[], ink?: string, pape
 			changed = true;
 		}
 	}
+	// a marker's edge: in the palette colour when it has the marker's colour (Matplotlib's
+	// default), so that a small marker, mostly edge, does not keep the old colour
 	const edge = trace.marker?.line?.color;
-	if (typeof edge === 'string' && inkAndPaper(edge, ink, paper) !== edge) {
-		out.marker = { ...(out.marker ?? trace.marker), line: { ...trace.marker.line, color: inkAndPaper(edge, ink, paper) } };
+	const newEdge = typeof edge === 'string' ? (edge === trace.marker?.color ? swap(edge) : inkAndPaper(edge, ink, paper)) : edge;
+	if (typeof edge === 'string' && newEdge !== edge) {
+		out.marker = { ...(out.marker ?? trace.marker), line: { ...trace.marker.line, color: newEdge } };
 		changed = true;
 	}
 	if (typeof trace.fillcolor === 'string' && swap(trace.fillcolor) !== trace.fillcolor) {
@@ -187,8 +190,8 @@ function compactColorbar(colorbar: unknown): Record<string, any> | undefined {
 }
 
 /**
- * The figure for a narrow screen, as chart tools for the web lay them out on phones: the legend
- * in a row above the plot instead of beside it, small margins (the axes make room for their
+ * The figure for a narrow screen, as chart tools for the web lay them out on phones: no legend
+ * in the plot (the page lists it below, see `legendEntries`), small margins (the axes make room for their
  * tick labels; room for the buttons and slider of an animation), at most six ticks on an x
  * axis, a font of at most 12 px and thin colorbars. The data stay as they are.
  */
@@ -230,11 +233,6 @@ export function compactFigure(figure: Figure): Figure {
 		if (key.startsWith('x') && axis.tickvals === undefined && axis.dtick === undefined && axis.nticks === undefined) axis.nticks = 6;
 		out[key] = axis;
 	}
-	if (layout.showlegend !== false) {
-		// at the top of the figure: hung from the plot's top edge (y > 1), Plotly draws a horizontal
-		// legend about 15 px too low, over the plot
-		out.legend = { ...layout.legend, orientation: 'h', x: 0, xanchor: 'left', y: 1, yanchor: 'top', yref: 'container' };
-	}
 	out.font = { ...layout.font, size: Math.min(layout.font?.size ?? 12, 12) };
 	if (title) out.title = { text: '' }; // shown above the figure, see movableTitle
 	if (moved) {
@@ -246,13 +244,51 @@ export function compactFigure(figure: Figure): Figure {
 		const bar = compactColorbar(layout[key]?.colorbar);
 		if (bar) out[key] = { ...layout[key], colorbar: bar };
 	}
-	const data = figure.data?.map((trace) => {
+	// the main legend is drawn by the page below the plot (see legendEntries), where it wraps and
+	// adds to the figure's height; in the figure it would take its rows from the plot
+	const listed = new Set(legendEntries(figure).entries.map((entry) => entry.trace));
+	const data = figure.data?.map((source, index) => {
+		const trace = listed.has(index) ? { ...source, showlegend: false } : source;
 		const bar = compactColorbar(trace.colorbar);
 		const markerBar = compactColorbar(trace.marker?.colorbar);
 		if (!bar && !markerBar) return trace;
 		return { ...trace, ...(bar ? { colorbar: bar } : {}), ...(markerBar ? { marker: { ...trace.marker, colorbar: markerBar } } : {}) };
 	});
 	return { ...figure, ...(data ? { data } : {}), layout: out };
+}
+
+/** An item of a figure's legend: a trace, and the traces that a click on it shows or hides. */
+export interface LegendEntry {
+	/** The index of the trace in `figure.data`. */
+	trace: number;
+	/** The trace's name, as written (markup and formulas included). */
+	name: string;
+	/** The traces of its legend group (itself included). */
+	group: number[];
+}
+
+// traces that Plotly lists in a legend only when told to: their colours are a colour scale
+const SCALE_TRACES = /^(heatmap|heatmapgl|contour|surface|histogram2d|histogram2dcontour|mesh3d|cone|streamtube|volume|isosurface|densitymapbox|densitymap|choropleth|choroplethmapbox|choroplethmap|image|pie|sunburst|treemap|icicle|funnelarea|sankey|parcoords|parcats|table|indicator|splom)$/;
+
+/**
+ * The items of a figure's main legend (`layout.legend`, not `legend2`, ...) as Plotly lists them:
+ * the traces with a legend entry, unless the legend is hidden or (by Plotly's default) has
+ * fewer than two items. A narrow screen draws them as text below the plot (see `compactFigure`).
+ */
+export function legendEntries(figure: Figure): { title: string; entries: LegendEntry[] } {
+	const layout = figure.layout ?? {};
+	const data = figure.data ?? [];
+	const listed = (trace: Trace) =>
+		trace.visible !== false &&
+		(trace.legend ?? 'legend') === 'legend' &&
+		(SCALE_TRACES.test(trace.type ?? 'scatter') ? trace.showlegend === true : trace.showlegend !== false);
+	const entries = data.flatMap((trace, index) => {
+		if (!listed(trace)) return [];
+		const group = trace.legendgroup ? data.flatMap((other, i) => (other.legendgroup === trace.legendgroup ? [i] : [])) : [index];
+		return [{ trace: index, name: String(trace.name ?? `trace ${index}`), group }];
+	});
+	const shown = layout.showlegend === true || (layout.showlegend !== false && entries.length > 1);
+	return { title: shown ? titleText(layout.legend?.title).trim() : '', entries: shown ? entries : [] };
 }
 
 /**
