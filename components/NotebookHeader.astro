@@ -1,8 +1,9 @@
 ---
-// The strip at the top of a tutorial page: download the notebook, open it on GitHub, and run it
+// The strip at the top of a tutorial page: download the notebook, open it in its source, and run it
 // in Colab or Binder if the site asks for that (`launch` of defineDocs); written by the
 // starlight-notebooks tool.
 import theme from 'virtual:starlight-theme/config';
+import { blobUrl } from '../lib/source.ts';
 import { withBase } from '../utils/base';
 
 export interface Props {
@@ -17,12 +18,13 @@ export interface Props {
 }
 const { download, source, status = 'executed', launch = true } = Astro.props;
 const filename = download.split('/').at(-1) ?? 'tutorial.ipynb';
-const github = `https://github.com/${theme.repository}/blob/${theme.branch}/${source}`;
+const view = theme.source ? blobUrl(theme.source, theme.branch, source) : null;
 const services = {
-	colab: { label: 'Open in Colab', href: `https://colab.research.google.com/github/${theme.repository}/blob/${theme.branch}/${source}` },
-	binder: { label: 'Launch Binder', href: `https://mybinder.org/v2/gh/${theme.repository}/${theme.branch}?labpath=${encodeURIComponent(source)}` },
+	colab: { label: 'Open in Colab', href: `https://colab.research.google.com/github/${theme.github}/blob/${theme.branch}/${source}` },
+	binder: { label: 'Launch Binder', href: `https://mybinder.org/v2/gh/${theme.github}/${theme.branch}?labpath=${encodeURIComponent(source)}` },
 };
-const launchLinks = launch ? theme.launch.map((service) => services[service]) : [];
+// Colab and Binder run notebooks from github.com only
+const launchLinks = launch && theme.github ? theme.launch.map((service) => services[service]) : [];
 const notes = {
 	executed: 'Run when the site was built.',
 	'not run': 'Not run for this build: the outputs are missing.',
@@ -31,7 +33,7 @@ const notes = {
 
 <div class="notebook-header not-content">
 	<a class="notebook-button" href={withBase(download)} download={filename} data-notebook-download>Download notebook</a>
-	<a class="notebook-button secondary" href={github}>View on GitHub</a>
+	{view && <a class="notebook-button secondary" href={view}>View on {theme.source?.label}</a>}
 	{launchLinks.map((link) => <a class="notebook-button secondary" href={link.href}>{link.label}</a>)}
 	<span class="notebook-note">{notes[status]}</span>
 </div>

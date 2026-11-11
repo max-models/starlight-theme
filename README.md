@@ -85,6 +85,7 @@ Other options:
 | Option | |
 |---|---|
 | `owner`, `branch` | GitHub owner (default `max-models`) and the branch of the edit and source links (default `devel`) |
+| `source` | Where the source lives, when not on GitHub: `{ url: 'https://gitlab.example.org/group/repo' }` points the "Source on ..." and "View on ..." links, the edit, license and CITATION.cff links, the social icon and the API reference's source links there (`host` `'github'` or `'gitlab'`, guessed from the URL; `label`, the name in "Source on <label>"). Colab, Binder and the GitHub release badge need github.com: elsewhere the launch buttons are left out and the badge comes only from PyPI (`release: { pypi }`). `false` for no source links |
 | `pydocs` | Overrides for the starlight-pydocs package entry |
 | `inventories` | Sphinx inventories for the API reference (default Python and NumPy) |
 | `crossref` | Sibling projects whose API reference the annotations link to, e.g. `['mpiarray']`. Default: the max-models projects among the dependencies of `pyproject` (`../pyproject.toml`); `false` for none |
@@ -391,8 +392,10 @@ light grid lines, hover labels in the page's colours. Black takes the text colou
 page background ("ink and paper"), except for labels on a colour map, so a figure drawn for a white
 page, e.g. converted from Matplotlib, reads in dark mode too.
 
-On a phone the figure is laid out compact: taller than on a desktop, the legend in a row at the
-top, a fixed title as text above it, small margins and room for an animation's controls. On a
+On a phone the figure is laid out compact: taller than on a desktop, small margins, room for an
+animation's controls, and the titles and the legend as text around the plot: the title and the y
+axis's title above it, the legend below it (a tap on an item hides its traces). They add to the
+height of the figure instead of taking it from the plot, which keeps its aspect ratio. On a
 touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
 
 **Formulas.** A label that is one formula, `$...$`, is typeset as LaTeX: in titles, axis titles,

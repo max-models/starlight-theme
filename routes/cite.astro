@@ -4,9 +4,10 @@
 import { Code } from '@astrojs/starlight/components';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import theme from 'virtual:starlight-theme/config';
+import { blobUrl } from '../lib/source.ts';
 
 const citation = theme.citation!;
-const cff = `https://github.com/${theme.repository}/blob/${theme.branch}/CITATION.cff`;
+const cff = theme.source ? blobUrl(theme.source, theme.branch, 'CITATION.cff') : null;
 ---
 
 <StarlightPage
@@ -17,5 +18,12 @@ const cff = `https://github.com/${theme.repository}/blob/${theme.branch}/CITATIO
 	<blockquote>{citation.text}</blockquote>
 	<h2 id="bibtex">BibTeX</h2>
 	<Code code={citation.bibtex} lang="bibtex" />
-	<p>From the <a href={cff}>CITATION.cff</a> of the repository, which GitHub also offers under "Cite this repository".</p>
+	{
+		cff && (
+			<p>
+				From the <a href={cff}>CITATION.cff</a> of the repository
+				{theme.github ? ', which GitHub also offers under "Cite this repository".' : '.'}
+			</p>
+		)
+	}
 </StarlightPage>

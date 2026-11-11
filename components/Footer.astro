@@ -7,7 +7,6 @@ import theme from 'virtual:starlight-theme/config';
 import { withBase } from '../utils/base';
 
 const siblings = theme.projects.filter((project) => !project.current);
-const github = `https://github.com/${theme.repository}`;
 ---
 
 <Default />
@@ -16,7 +15,7 @@ const github = `https://github.com/${theme.repository}`;
 		<a href={theme.family.href}>Part of the {theme.family.name}</a>
 		{theme.license && (theme.license.href ? <a href={theme.license.href}>{theme.license.name} license</a> : <span>{theme.license.name} license</span>)}
 		{theme.citation && <a href={withBase('/cite/')}>Cite</a>}
-		<a href={github}>Source on GitHub</a>
+		{theme.source && <a href={theme.source.url}>Source on {theme.source.label}</a>}
 	</p>
 	{
 		siblings.length > 0 && (

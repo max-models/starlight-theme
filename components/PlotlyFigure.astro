@@ -63,7 +63,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 </figure>
 
 <script>
-	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, legendEntries, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
 	import { captionParts, formulaOf, hasMath, mathjaxConfig } from '../lib/mathjax.ts';
 	// MathJax 3 (TeX to SVG), served as a file of its own: a classic script that sets window.MathJax
 	// @ts-ignore: a URL import
@@ -156,12 +156,16 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 	}
 
 	// The figure as plotted: the site's palette and theme colours over a copy of the file's figure.
-	function themed(source: Figure, thumbnail: boolean) {
+	// (`hidden`: the traces hidden with the legend below a phone's plot, see syncLegend)
+	function themed(source: Figure, thumbnail: boolean, hidden: Set<number> = new Set()) {
 		// a white plot area keeps the figure's own colours, chosen for a white background
 		const whitePlot = webHints(source).white_plot === true;
 		const figure = whitePlot
 			? structuredClone(source)
 			: paletteFigure(structuredClone(source), palette(), css('--sl-color-text'), css('--sl-color-bg'));
+		figure.data?.forEach((trace, index) => {
+			if (hidden.has(index)) trace.visible = 'legendonly';
+		});
 		const layout: Layout = figure.layout ?? {};
 		layout.uirevision ??= 'theme'; // keep zoom and pan when the theme changes
 		if (thumbnail) merge(layout, expand(thumbnailLayout(layout)));
@@ -189,7 +193,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		return !thumbnail && compact.matches ? compactFigure(shown) : shown;
 	}
 
-	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any }[] = [];
+	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any; hidden: Set<number> }[] = [];
 
 	// MathJax, once per page, for the figures with formulas; plotly.js finds it as window.MathJax
 	let mathjax: Promise<any> | null = null;
@@ -255,6 +259,91 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		caption.replaceChildren(...lines);
 	}
 
+	const SVG = 'http://www.w3.org/2000/svg';
+	const first = (value: unknown) => (Array.isArray(value) ? value[0] : value);
+
+	// The sample of a trace in the legend: its line, its marker or a filled square, in the colours
+	// Plotly drew it with.
+	function swatch(trace: Record<string, any> | undefined): SVGSVGElement {
+		const svg = document.createElementNS(SVG, 'svg');
+		svg.setAttribute('viewBox', '0 0 24 12');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.classList.add('plotly-legend-swatch');
+		const add = (tag: string, attributes: Record<string, string | number>) => {
+			const node = document.createElementNS(SVG, tag);
+			for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+			svg.append(node);
+		};
+		const type = trace?.type ?? 'scatter';
+		const mode: string = trace?.mode ?? (type.startsWith('scatter') ? 'lines' : '');
+		const lineColor = first(trace?.line?.color);
+		const markerColor = first(trace?.marker?.color) ?? lineColor;
+		const fill = trace?.fill && trace.fill !== 'none' ? trace.fillcolor : undefined;
+		if (fill || !/lines|markers/.test(mode)) {
+			const color = fill ?? (typeof markerColor === 'string' ? markerColor : undefined) ?? 'currentColor';
+			add('rect', { x: 5, y: 1, width: 14, height: 10, rx: 2, fill: color, stroke: lineColor ?? 'none' });
+			return svg;
+		}
+		if (mode.includes('lines') && (trace?.line?.width ?? 2) > 0) {
+			const dash: string = trace?.line?.dash ?? 'solid';
+			const dasharray = { dot: '1.5 2.5', dash: '5 3', longdash: '8 3', dashdot: '5 2 1.5 2', longdashdot: '8 2 1.5 2' }[dash] ?? (/^[\d.\s,px]+$/.test(dash) && dash !== 'solid' ? dash : '');
+			add('line', { x1: 1, y1: 6, x2: 23, y2: 6, stroke: lineColor ?? 'currentColor', 'stroke-width': Math.min(Math.max(trace?.line?.width ?? 2, 1.5), 4), ...(dasharray ? { 'stroke-dasharray': dasharray } : {}) });
+		}
+		if (mode.includes('markers')) {
+			const symbol = String(first(trace?.marker?.symbol) ?? 'circle');
+			const color = typeof markerColor === 'string' ? markerColor : 'currentColor';
+			const edge = first(trace?.marker?.line?.color);
+			if (/^(x|cross)/.test(symbol)) {
+				const d = symbol.startsWith('x') ? 'M8.5 2.5 15.5 9.5M15.5 2.5 8.5 9.5' : 'M12 1.5V10.5M7.5 6H16.5';
+				add('path', { d, stroke: edge && trace?.marker?.line?.width ? edge : color, 'stroke-width': 2, 'stroke-linecap': 'round' });
+			} else if (/^square/.test(symbol)) add('rect', { x: 8.5, y: 2.5, width: 7, height: 7, fill: color });
+			else add('circle', { cx: 12, cy: 6, r: 3.5, fill: color });
+		}
+		return svg;
+	}
+
+	// On a phone the main legend is a list below the plot, where it wraps and adds to the height of
+	// the figure instead of taking rows from the plot (compactFigure leaves it out of the plot). A
+	// tap on an item hides its traces, as a click on Plotly's legend does.
+	function syncLegend(item: (typeof rendered)[number]) {
+		const { element: plot, figure, thumbnail, Plotly, hidden } = item;
+		const { title, entries } = !thumbnail && compact.matches ? legendEntries(figure) : { title: '', entries: [] };
+		let legend = plot.nextElementSibling as HTMLElement | null;
+		if (!entries.length) return legend?.remove();
+		if (!legend) {
+			legend = document.createElement('div');
+			legend.className = 'plotly-legend';
+			legend.setAttribute('role', 'group');
+			plot.after(legend);
+		}
+		const items: HTMLElement[] = [];
+		if (title) {
+			const heading = document.createElement('span');
+			heading.className = 'plotly-legend-title';
+			setText(heading, title);
+			items.push(heading);
+		}
+		const drawn: Record<string, any>[] = (plot as any)._fullData ?? [];
+		for (const entry of entries) {
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.className = 'plotly-legend-item';
+			button.setAttribute('aria-pressed', String(!hidden.has(entry.trace)));
+			const label = document.createElement('span');
+			setText(label, entry.name);
+			button.append(swatch(drawn.find((trace) => trace.index === entry.trace) ?? figure.data?.[entry.trace]), label);
+			button.addEventListener('click', () => {
+				const hide = !hidden.has(entry.trace);
+				for (const index of entry.group) hide ? hidden.add(index) : hidden.delete(index);
+				Plotly.restyle(plot, { visible: hide ? 'legendonly' : true }, entry.group);
+				for (const other of legend!.querySelectorAll<HTMLElement>('[data-trace]')) other.setAttribute('aria-pressed', String(!hidden.has(Number(other.dataset.trace))));
+			});
+			button.dataset.trace = String(entry.trace);
+			items.push(button);
+		}
+		legend.replaceChildren(...items);
+	}
+
 	async function render(element: HTMLElement) {
 		const thumbnail = element.hasAttribute('data-thumbnail');
 		try {
@@ -288,7 +377,13 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 			syncCaption(plot, figure, thumbnail);
 			// with a figure object, Plotly reads the config from the object, not from a third argument
 			await Plotly.newPlot(plot, { ...themed(figure, thumbnail), config: config(thumbnail) });
-			rendered.push({ element: plot, figure, thumbnail, Plotly });
+			// plotly.js lays out axes of equal scale (scaleanchor) before MathJax has typeset the
+			// legend and titles, which then take another size: laid out again, they are equal
+			if (hasMath(figure)) await Plotly.redraw(plot);
+			const item = { element: plot, figure, thumbnail, Plotly, hidden: new Set<number>() };
+			rendered.push(item);
+			syncLegend(item);
+			element.classList.add('is-drawn');
 		} catch (error) {
 			element.textContent = `Could not load the figure (${(error as Error).message}).`;
 		}
@@ -307,9 +402,12 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 	document.querySelectorAll<HTMLElement>('[data-plotly]').forEach((element) => observer.observe(element));
 
 	const redraw = () => {
-		for (const { element, figure, thumbnail, Plotly } of rendered) {
+		for (const item of rendered) {
+			const { element, figure, thumbnail, Plotly, hidden } = item;
 			syncCaption(element, figure, thumbnail);
-			Plotly.react(element, { ...themed(figure, thumbnail), config: config(thumbnail) });
+			Promise.resolve(Plotly.react(element, { ...themed(figure, thumbnail, hidden), config: config(thumbnail) }))
+				.then(() => hasMath(figure) && Plotly.redraw(element)) // as in render
+				.then(() => syncLegend(item));
 		}
 	};
 	// the theme toggle sets data-theme on <html>; a phone turned sideways can leave the compact width
@@ -346,18 +444,39 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		aspect-ratio: var(--aspect);
 		min-height: 12rem;
 	}
-	/* a phone (COMPACT_QUERY in lib/plotly-theme.ts): at most 1.3 times as wide as tall, and at
-	   most 0.85 with a slider or buttons, so that the plot keeps a usable height */
+	/* a phone (COMPACT_QUERY in lib/plotly-theme.ts): the plot at most 1.1 times as wide as tall,
+	   and at most 0.85 with a slider or buttons, so that it keeps a usable height. Once drawn, the
+	   ratio is the plot's alone: the titles above it and the legend below it add to the height of
+	   the frame instead of taking it from the plot. */
 	@media (max-width: 40rem) {
 		.plotly-figure {
 			min-height: 20rem;
 			padding: 0.25rem;
 		}
 		.plotly-figure.has-aspect {
-			aspect-ratio: min(var(--aspect), 1.3);
+			aspect-ratio: min(var(--aspect), 1.1);
 			min-height: 16rem;
 		}
 		.plotly-figure.has-aspect.has-controls {
+			aspect-ratio: min(var(--aspect), 0.85);
+		}
+		.plotly-figure.is-drawn:not(.thumbnail) {
+			aspect-ratio: auto;
+			min-height: 0;
+		}
+		.plotly-figure.is-drawn:not(.thumbnail) :global(.plotly-plot) {
+			flex: none;
+			height: 19.5rem;
+		}
+		.plotly-figure.has-aspect.is-drawn :global(.plotly-plot) {
+			height: auto;
+		}
+		.plotly-figure.has-aspect.is-drawn :global(.plotly-plot) {
+			flex: none;
+			aspect-ratio: min(var(--aspect), 1.1);
+			min-height: 14rem;
+		}
+		.plotly-figure.has-aspect.has-controls.is-drawn :global(.plotly-plot) {
 			aspect-ratio: min(var(--aspect), 0.85);
 		}
 	}
@@ -391,6 +510,46 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		margin-top: 0.25rem;
 		color: var(--sl-color-gray-2);
 		font-size: var(--sl-text-xs);
+	}
+	/* the legend below a phone's plot (syncLegend): items that wrap, a tap hides a trace */
+	.plotly-figure :global(.plotly-legend) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.125rem 0.75rem;
+		padding: 0.25rem 0.5rem 0.5rem;
+		font-size: var(--sl-text-xs);
+		line-height: 1.3;
+	}
+	/* not the markdown's space between siblings */
+	.plotly-figure :global(.plotly-legend > *),
+	.plotly-figure :global(.plotly-legend-item > *) {
+		margin: 0;
+	}
+	.plotly-figure :global(.plotly-legend-title) {
+		color: var(--sl-color-gray-2);
+	}
+	.plotly-figure :global(.plotly-legend-item) {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-height: 1.75rem;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--sl-color-text);
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
+	}
+	.plotly-figure :global(.plotly-legend-item[aria-pressed='false']) {
+		opacity: 0.45;
+	}
+	.plotly-figure :global(.plotly-legend-swatch) {
+		flex: none;
+		width: 1.5rem;
+		height: 0.75rem;
+		overflow: visible;
 	}
 	.plotly-poster {
 		flex: 1 1 auto;

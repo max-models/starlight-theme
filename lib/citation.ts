@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import { blobUrl, type Source } from './source.ts';
 
 export interface Citation {
 	/** One line: authors, year, title, version, URL. */
@@ -13,7 +14,7 @@ export interface Citation {
 export interface License {
 	/** e.g. "MIT". */
 	name: string;
-	/** The license file on GitHub, if the repository has one. */
+	/** The license file in the repository's source, if it has one. */
 	href?: string;
 }
 
@@ -98,10 +99,10 @@ const LICENSE_FILES = ['LICENSE', 'LICENSE.txt', 'LICENSE.md', 'COPYING'];
 
 /**
  * The license of the project at `root`: the name from CITATION.cff, pyproject.toml (`license =
- * "MIT"`) or the first line of the license file, and a link to that file in `github` (a
- * https://github.com/<owner>/<repo> URL) on `branch`.
+ * "MIT"`) or the first line of the license file, and a link to that file in `source` on `branch`
+ * (none without a source).
  */
-export function readLicense(root: string, github: string, branch: string): License | undefined {
+export function readLicense(root: string, source: Source | null, branch: string): License | undefined {
 	const file = LICENSE_FILES.find((name) => existsSync(join(root, name)));
 	const cffPath = join(root, 'CITATION.cff');
 	const pyprojectPath = join(root, 'pyproject.toml');
@@ -110,5 +111,5 @@ export function readLicense(root: string, github: string, branch: string): Licen
 		(existsSync(pyprojectPath) ? readFileSync(pyprojectPath, 'utf8').match(/^license\s*=\s*"([^"]+)"/m)?.[1] : undefined) ??
 		(file ? readFileSync(join(root, file), 'utf8').trim().split('\n')[0].replace(/\s+license$/i, '').trim() : undefined);
 	if (!name) return undefined;
-	return { name, ...(file ? { href: `${github}/blob/${branch}/${file}` } : {}) };
+	return { name, ...(file && source ? { href: blobUrl(source, branch, file) } : {}) };
 }

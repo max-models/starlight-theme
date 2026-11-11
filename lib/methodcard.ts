@@ -65,7 +65,7 @@ export interface MethodcardConfig {
 	macros: Record<string, string>;
 	/** The base path of the site, e.g. "/freeofcharge". */
 	base: string;
-	/** The source of the package on GitHub, to which a card's `filepath` is appended. */
+	/** The source of the package (a URL to which a card's `filepath` is appended); empty for no source links. */
 	source: string;
 	/** One page per module (see `MethodcardOptions.pages`). */
 	pages: boolean;

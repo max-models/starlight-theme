@@ -11,6 +11,7 @@ import type { Citation, License } from './citation.ts';
 import { menuEntries, PROJECTS_URL, type MenuEntry, type Project } from './project-menu.ts';
 import { projects as defaultProjects } from './projects.ts';
 import type { ReleaseSource } from './release.ts';
+import { githubRepository, resolveSource, type Source, type SourceOptions } from './source.ts';
 
 export interface NavLink {
 	label: string;
@@ -36,8 +37,13 @@ export interface Versions {
 export type LaunchService = 'colab' | 'binder';
 
 export interface ThemeOptions {
-	/** GitHub repository as "owner/name": the "View on GitHub" links of notebook pages. */
+	/** GitHub repository as "owner/name": the projects menu, and the source links unless `source` is set. */
 	repository: string;
+	/**
+	 * Where the source lives (the "Source on ..." and "View on ..." links, CITATION.cff): by default
+	 * github.com/<repository>; another forge with `{ url }` (see `SourceOptions`), `false` for none.
+	 */
+	source?: SourceOptions | false;
 	/** Branch for the notebook source links. Default "devel". */
 	branch?: string;
 	/** Links in the header, between the title and the search. */
@@ -56,7 +62,7 @@ export interface ThemeOptions {
 	projectsUrl?: string | false;
 	/**
 	 * The latest release in the hero: from PyPI with `pypi` (the distribution name; GitHub when that
-	 * fails), else from the GitHub releases of `repository`; `false` for no badge.
+	 * fails), else from the GitHub releases of the source (when it is on github.com); `false` for no badge.
 	 */
 	release?: { pypi?: string } | false;
 	/** The wave logo before the site title, when the site sets no Starlight `logo`. Default true. */
@@ -74,6 +80,10 @@ export interface ThemeOptions {
 /** What `virtual:starlight-theme/config` exports. */
 export interface ThemeConfig {
 	repository: string;
+	/** The resolved source; null for no source links. */
+	source: Source | null;
+	/** "owner/name" when the source is on github.com (Colab and Binder buttons), else null. */
+	github: string | null;
 	branch: string;
 	nav: (NavLink & { section: string })[];
 	versions: Versions | null;
@@ -115,15 +125,19 @@ function viteConfigModule(config: ThemeConfig): NonNullable<ViteUserConfig['plug
 
 export function themeConfig(options: ThemeOptions): ThemeConfig {
 	const [owner, repo] = options.repository.split('/');
+	const source = resolveSource(options.source, options.repository);
+	const github = githubRepository(source);
 	return {
 		repository: options.repository,
+		source,
+		github,
 		branch: options.branch ?? 'devel',
 		nav: (options.nav ?? []).map((link) => ({ ...link, section: link.section ?? sectionOf(link.link) })),
 		versions: options.versions ?? null,
 		launch: options.launch ?? [],
 		projects: options.projects === false ? [] : menuEntries(options.projects ?? defaultProjects, owner, repo),
 		projectsUrl: options.projects === undefined && options.projectsUrl !== false ? (options.projectsUrl ?? PROJECTS_URL) : null,
-		release: options.release === false ? null : { github: options.repository, pypi: options.release?.pypi ?? null },
+		release: options.release === false ? null : { github, pypi: options.release?.pypi ?? null },
 		logo: options.logo ?? true,
 		citation: options.citation ?? null,
 		license: options.license ?? null,

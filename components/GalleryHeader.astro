@@ -1,7 +1,8 @@
 ---
-// The strip at the top of a gallery page: download the script and open it on GitHub
+// The strip at the top of a gallery page: download the script and open it in its source
 // (written by the starlight-gallery tool).
 import theme from 'virtual:starlight-theme/config';
+import { blobUrl } from '../lib/source.ts';
 import { withBase } from '../utils/base';
 
 export interface Props {
@@ -14,7 +15,7 @@ export interface Props {
 }
 const { download, source, status = 'run' } = Astro.props;
 const filename = download.split('/').at(-1) ?? 'example.py';
-const github = `https://github.com/${theme.repository}/blob/${theme.branch}/${source}`;
+const view = theme.source ? blobUrl(theme.source, theme.branch, source) : null;
 const notes = {
 	run: 'Run when the site was built.',
 	'not run': 'Not run for this build: the figures are missing.',
@@ -23,7 +24,7 @@ const notes = {
 
 <div class="gallery-header not-content">
 	<a class="gallery-button" href={withBase(download)} download={filename}>Download script</a>
-	<a class="gallery-button secondary" href={github}>View on GitHub</a>
+	{view && <a class="gallery-button secondary" href={view}>View on {theme.source?.label}</a>}
 	<span class="gallery-note">{notes[status]}</span>
 </div>
 
