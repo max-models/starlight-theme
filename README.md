@@ -395,8 +395,10 @@ page, e.g. converted from Matplotlib, reads in dark mode too.
 On a phone the figure is laid out compact: taller than on a desktop, small margins, room for an
 animation's controls, and the titles and the legend as text around the plot: the title and the y
 axis's title above it, the legend below it (a tap on an item hides its traces). They add to the
-height of the figure instead of taking it from the plot, which keeps its aspect ratio. On a
-touch screen the toolbar is hidden and a drag scrolls the page instead of zooming.
+height of the figure instead of taking it from the plot, which keeps its aspect ratio. The colour
+bars lie horizontally below the plot, one row each, so the plot keeps the full width; they too
+add to the height. On a touch screen the toolbar is hidden and a drag scrolls the page instead of
+zooming.
 
 **Formulas.** A label that is one formula, `$...$`, is typeset as LaTeX: in titles, axis titles,
 legends, annotations and colour bars (plotly.js does not typeset hover labels). Text in a formula
