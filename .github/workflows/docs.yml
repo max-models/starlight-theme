@@ -413,6 +413,8 @@ jobs:
   # assembly fails before anything is deployed.
   assemble:
     needs: [plan, build]
+    # a skipped notebook job (notebooks: false, or none to run) would skip this job too
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -466,7 +468,7 @@ jobs:
 
   deploy:
     needs: [plan, assemble]
-    if: needs.plan.outputs.deploy == 'true'
+    if: ${{ !cancelled() && needs.assemble.result == 'success' && needs.plan.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
