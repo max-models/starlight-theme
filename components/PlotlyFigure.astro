@@ -63,7 +63,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 </figure>
 
 <script>
-	import { COMPACT_QUERY, PALETTE_SIZE, calmLayout, compactFigure, hasControls, legendEntries, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
+	import { COMPACT_COLORBAR_PAD, COMPACT_COLORBAR_ROW, COMPACT_QUERY, PALETTE_SIZE, calmLayout, colorbarCount, compactFigure, hasControls, legendEntries, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
 	import { captionParts, formulaOf, hasMath, mathjaxConfig } from '../lib/mathjax.ts';
 	// MathJax 3 (TeX to SVG), served as a file of its own: a classic script that sets window.MathJax
 	// @ts-ignore: a URL import
@@ -157,7 +157,29 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 
 	// The figure as plotted: the site's palette and theme colours over a copy of the file's figure.
 	// (`hidden`: the traces hidden with the legend below a phone's plot, see syncLegend)
-	function themed(source: Figure, thumbnail: boolean, hidden: Set<number> = new Set()) {
+	// On a phone the colorbars lie below the plot, one row each (see compactFigure): the plot box
+	// grows by those rows, so the plot keeps its height. Returns the box's height in pixels, which
+	// places the rows; undefined where nothing changes (a wide screen, no colorbars).
+	function compactHeight(plot: HTMLElement, figure: Figure, thumbnail: boolean): number | undefined {
+		const rows = !thumbnail && compact.matches ? colorbarCount(figure) : 0;
+		const controls = hasControls(figure);
+		if (!rows && !(controls && !thumbnail && compact.matches)) {
+			plot.style.removeProperty('height');
+			return undefined;
+		}
+		const frame = plot.closest<HTMLElement>('.plotly-figure');
+		const aspect = Number(frame?.style.getPropertyValue('--aspect')) || 0;
+		// the plot at most 1.1 times as wide as tall, as in the CSS below; the buttons and slider of
+		// an animation (compactFigure's margins: 70 px above, 150 below) come on top of it
+		const ratio = Math.min(aspect, 1.1);
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		const plotHeight = aspect > 0 ? Math.max(plot.clientWidth / ratio, 14 * rem) : 19.5 * rem;
+		const height = Math.round(plotHeight + (controls ? 160 : 0) + (rows ? rows * COMPACT_COLORBAR_ROW + COMPACT_COLORBAR_PAD : 0));
+		plot.style.height = `${height}px`;
+		return height;
+	}
+
+	function themed(source: Figure, thumbnail: boolean, hidden: Set<number> = new Set(), height?: number) {
 		// a white plot area keeps the figure's own colours, chosen for a white background
 		const whitePlot = webHints(source).white_plot === true;
 		const figure = whitePlot
@@ -190,7 +212,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		});
 		if (!thumbnail && touch.matches) controls.dragmode = false;
 		const shown = { data: figure.data, layout: controls, frames: thumbnail ? [] : figure.frames };
-		return !thumbnail && compact.matches ? compactFigure(shown) : shown;
+		return !thumbnail && compact.matches ? compactFigure(shown, { height }) : shown;
 	}
 
 	const rendered: { element: HTMLElement; figure: Figure; thumbnail: boolean; Plotly: any; hidden: Set<number> }[] = [];
@@ -376,7 +398,8 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 			element.replaceChildren(plot);
 			syncCaption(plot, figure, thumbnail);
 			// with a figure object, Plotly reads the config from the object, not from a third argument
-			await Plotly.newPlot(plot, { ...themed(figure, thumbnail), config: config(thumbnail) });
+			const height = compactHeight(plot, figure, thumbnail);
+			await Plotly.newPlot(plot, { ...themed(figure, thumbnail, new Set(), height), config: config(thumbnail) });
 			// plotly.js lays out axes of equal scale (scaleanchor) before MathJax has typeset the
 			// legend and titles, which then take another size: laid out again, they are equal
 			if (hasMath(figure)) await Plotly.redraw(plot);
@@ -405,7 +428,8 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		for (const item of rendered) {
 			const { element, figure, thumbnail, Plotly, hidden } = item;
 			syncCaption(element, figure, thumbnail);
-			Promise.resolve(Plotly.react(element, { ...themed(figure, thumbnail, hidden), config: config(thumbnail) }))
+			const height = compactHeight(element, figure, thumbnail);
+			Promise.resolve(Plotly.react(element, { ...themed(figure, thumbnail, hidden, height), config: config(thumbnail) }))
 				.then(() => hasMath(figure) && Plotly.redraw(element)) // as in render
 				.then(() => syncLegend(item));
 		}

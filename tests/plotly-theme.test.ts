@@ -1,6 +1,6 @@
 // The site's colours for Plotly figures: palette slots and the hints of web figures.
 import { describe, expect, it } from 'vitest';
-import { calmLayout, colorSlot, compactFigure, hasControls, inkAndPaper, legendEntries, isBlack, isWhite, movableTitle, movableYTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
+import { COMPACT_COLORBAR_PAD, COMPACT_COLORBAR_ROW, calmLayout, colorSlot, colorbarCount, compactFigure, hasControls, inkAndPaper, legendEntries, isBlack, isWhite, movableTitle, movableYTitle, paletteFigure, recolorTrace, themeControls, webHints, withAlphaOf } from '../lib/plotly-theme.ts';
 
 const palette = ['#111111', '#222222', '#333333'];
 
@@ -145,9 +145,60 @@ describe('compactFigure', () => {
 		expect(layout.margin).toEqual({ l: 4, r: 12, t: 16, b: 2, pad: 0 });
 		expect(layout).not.toHaveProperty('legend');
 		expect(compactFigure({}).layout!.margin.l).toBe(16);
-		const movie = compactFigure({ layout: { sliders: [{}], margin: { b: 60 } } }).layout!;
-		expect(movie.margin).toMatchObject({ t: 70, b: 150 });
+		const movie = compactFigure({ layout: { sliders: [{}], updatemenus: [{}], margin: { b: 60 } } }).layout!;
+		expect(movie.margin).toMatchObject({ t: 70, b: 150 }); // the buttons above the plot
+		// buttons below the plot, beside the slider, need no room above it
+		const below = compactFigure({ layout: { sliders: [{ y: 0 }], updatemenus: [{ y: 0 }], margin: { t: 60 } } }).layout!;
+		expect(below.margin.t).toBe(16);
 		expect(compactFigure({ layout: { updatemenus: [{}], margin: { t: 40, b: 200 } } }).layout!.margin).toMatchObject({ t: 40, b: 200 });
+	});
+});
+
+describe('compactFigure with the height of the figure', () => {
+	const figure = {
+		data: [
+			{ type: 'heatmap', coloraxis: 'coloraxis' },
+			{ type: 'scatter', marker: { coloraxis: 'coloraxis2' } },
+			{ type: 'heatmap', colorbar: { title: 'own' } },
+			{ type: 'contour', showscale: false },
+			{ type: 'scatter', marker: { showscale: true, colorbar: { title: { text: 'marker' } } } },
+		],
+		layout: {
+			xaxis: { title: 'x' },
+			coloraxis: { colorbar: { title: { text: 'φ' } } },
+			coloraxis2: { colorbar: { title: 'E' } },
+			coloraxis3: { colorbar: {} }, // used by no trace: no colorbar
+		},
+	};
+
+	it('counts the colorbars a figure shows', () => {
+		expect(colorbarCount(figure)).toBe(4);
+		expect(colorbarCount({ data: [{ type: 'scatter' }] })).toBe(0);
+		expect(colorbarCount({ data: [{ type: 'heatmap', visible: false }] })).toBe(0);
+	});
+
+	it('lays the colorbars horizontally below the plot, one row each', () => {
+		const out = compactFigure(figure, { height: 600 });
+		const layout = out.layout!;
+		expect(layout.margin.b).toBe(64 + 4 * COMPACT_COLORBAR_ROW + COMPACT_COLORBAR_PAD);
+		const plotHeight = 600 - layout.margin.t - layout.margin.b;
+		const bars = [layout.coloraxis.colorbar, layout.coloraxis2.colorbar, out.data![2].colorbar, out.data![4].marker.colorbar];
+		bars.forEach((bar, row) => {
+			expect(bar).toMatchObject({ orientation: 'h', yref: 'paper', yanchor: 'top', len: 1, x: 0.5, xanchor: 'center' });
+			expect(bar.title.side).toBe('top');
+			// the rows go down from below the x axis, in the order of the color axes and the traces
+			expect(bar.y * plotHeight).toBeCloseTo(-(64 + 20 + row * COMPACT_COLORBAR_ROW));
+		});
+		expect(layout.coloraxis.colorbar.title.text).toBe('φ');
+		expect(layout.coloraxis2.colorbar.title).toEqual({ text: 'E', side: 'top' });
+		expect(layout.coloraxis3.colorbar).toEqual({ thickness: 10, xpad: 4 }); // not shown: as without a height
+	});
+
+	it('keeps thin vertical colorbars without a height', () => {
+		const layout = compactFigure(figure).layout!;
+		expect(layout.coloraxis.colorbar).toMatchObject({ thickness: 10 });
+		expect(layout.coloraxis.colorbar.orientation).toBeUndefined();
+		expect(layout.margin.b).toBe(64);
 	});
 });
 
