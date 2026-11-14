@@ -190,12 +190,81 @@ function compactColorbar(colorbar: unknown): Record<string, any> | undefined {
 }
 
 /**
+ * The height in pixels of one colorbar laid horizontally below the plot on a narrow screen: its
+ * title, the bar and its tick labels (see `compactFigure`).
+ */
+export const COMPACT_COLORBAR_ROW = 60;
+
+/**
+ * Spare height in pixels below the last colorbar of a narrow screen: Plotly's automatic margins
+ * can push the plot area, and the colorbars with it, down by a few pixels.
+ */
+export const COMPACT_COLORBAR_PAD = 16;
+
+// traces drawn with a colour scale, which show a colorbar unless told not to
+const SCALE_COLORBAR = /^(heatmap|heatmapgl|contour|histogram2d|histogram2dcontour|surface|mesh3d|cone|streamtube|volume|isosurface)$/;
+
+/** Where the colorbars of a figure are: color axes, traces and trace markers, in drawing order. */
+type ColorbarPlace = { kind: 'axis'; key: string } | { kind: 'trace' | 'marker'; index: number };
+
+function colorbarPlaces(figure: Figure): ColorbarPlace[] {
+	const layout = figure.layout ?? {};
+	const places: ColorbarPlace[] = [];
+	const axes = new Set<string>();
+	(figure.data ?? []).forEach((trace, index) => {
+		if (trace.visible === false) return;
+		if (trace.coloraxis) axes.add(trace.coloraxis);
+		else if (trace.showscale !== false && (trace.colorbar || SCALE_COLORBAR.test(trace.type ?? ''))) places.push({ kind: 'trace', index });
+		const marker = trace.marker ?? {};
+		if (marker.coloraxis) axes.add(marker.coloraxis);
+		else if (marker.showscale === true) places.push({ kind: 'marker', index });
+	});
+	const axisPlaces: ColorbarPlace[] = Object.keys(layout)
+		.filter((key) => /^coloraxis\d*$/.test(key) && axes.has(key) && layout[key]?.showscale !== false)
+		.sort()
+		.map((key) => ({ kind: 'axis', key }));
+	return [...axisPlaces, ...places];
+}
+
+/** The number of colorbars a figure shows (see `compactFigure`). */
+export function colorbarCount(figure: Figure): number {
+	return colorbarPlaces(figure).length;
+}
+
+// a colorbar laid horizontally below the plot, `offset` pixels below the bottom of the plot area
+// (`plotHeight` pixels high): the title above the bar, the tick labels below it. Placed in the
+// plot area's coordinates: with the container's, Plotly draws the title over the bar.
+function horizontalColorbar(colorbar: unknown, offset: number, plotHeight: number): Record<string, any> {
+	const bar = (colorbar && typeof colorbar === 'object' ? colorbar : {}) as Record<string, any>;
+	const title = typeof bar.title === 'string' ? { text: bar.title } : (bar.title ?? {});
+	return {
+		...bar,
+		orientation: 'h',
+		thickness: 8,
+		len: 1,
+		lenmode: 'fraction',
+		x: 0.5,
+		xanchor: 'center',
+		xref: 'paper',
+		y: -offset / plotHeight,
+		yanchor: 'top',
+		yref: 'paper',
+		xpad: 0,
+		ypad: 0,
+		title: { ...title, side: 'top' },
+	};
+}
+
+/**
  * The figure for a narrow screen, as chart tools for the web lay them out on phones: no legend
  * in the plot (the page lists it below, see `legendEntries`), small margins (the axes make room for their
  * tick labels; room for the buttons and slider of an animation), at most six ticks on an x
- * axis, a font of at most 12 px and thin colorbars. The data stay as they are.
+ * axis, a font of at most 12 px and thin colorbars. Given the figure's `height` in pixels, its
+ * colorbars lie horizontally below the plot, one row each (`COMPACT_COLORBAR_ROW`, which the
+ * page adds to the figure's height: see `colorbarCount`), and the plot keeps the full width:
+ * vertical colorbars beside it would take a third of a phone's width. The data stay as they are.
  */
-export function compactFigure(figure: Figure): Figure {
+export function compactFigure(figure: Figure, options: { height?: number } = {}): Figure {
 	const layout = figure.layout ?? {};
 	const out: Record<string, any> = { ...layout };
 	const axes = Object.keys(layout).filter((key) => CARTESIAN_AXIS.test(key));
@@ -213,6 +282,9 @@ export function compactFigure(figure: Figure): Figure {
 		menus.some((menu) => Math.abs((menu.y ?? 1) - (slider.y ?? 0)) < 0.05 && (menu.x ?? -0.05) <= (slider.x ?? 0));
 	const sliders: Record<string, any>[] = Array.isArray(layout.sliders) ? layout.sliders : [];
 	const moved = sliders.some(besideButtons);
+	// buttons above the plot (Plotly's default place, y = 1) need room there; below it, with the
+	// slider (y = 0, as plasma-plots puts them), they do not
+	const buttonsAbove = menus.some((menu) => (menu.y ?? 1) > 0.5);
 	const cap = (value: unknown, max: number) => Math.min(typeof value === 'number' ? value : max, max);
 	out.margin = {
 		...margin,
@@ -220,7 +292,7 @@ export function compactFigure(figure: Figure): Figure {
 		r: cap(margin.r, 12),
 		// the buttons (above the plot) and the slider (below it) of an animation sit in the
 		// margins, and Plotly does not make room for a slider: 150 px fit it with its labels
-		t: controls ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) && !title ? 44 : 16),
+		t: buttonsAbove ? cap(margin.t, 70) : cap(margin.t, titleText(layout.title) && !title ? 44 : 16),
 		b: controls ? Math.max(typeof margin.b === 'number' ? margin.b : 0, 150) + (moved ? 50 : 0) : cap(margin.b, titled('x') ? 64 : 16),
 		pad: 0,
 	};
@@ -240,8 +312,16 @@ export function compactFigure(figure: Figure): Figure {
 			besideButtons(slider) ? { ...slider, x: 0, len: 1, pad: { ...slider.pad, t: (slider.pad?.t ?? 20) + 50 } } : slider
 		);
 	}
+	const places = options.height ? colorbarPlaces(figure) : [];
+	// the rows of the colorbars below what the bottom margin holds (the x axis, a slider)
+	const below = out.margin.b;
+	if (places.length) out.margin.b += places.length * COMPACT_COLORBAR_ROW + COMPACT_COLORBAR_PAD;
+	const plotHeight = Math.max((options.height ?? 0) - out.margin.t - out.margin.b, 1);
+	const rowOf = (match: (place: ColorbarPlace) => boolean) => places.findIndex(match);
+	const offset = (row: number) => below + 20 + row * COMPACT_COLORBAR_ROW; // 20: room for the title
 	for (const key of Object.keys(layout).filter((key) => /^coloraxis\d*$/.test(key))) {
-		const bar = compactColorbar(layout[key]?.colorbar);
+		const row = rowOf((place) => place.kind === 'axis' && place.key === key);
+		const bar = row >= 0 ? horizontalColorbar(layout[key]?.colorbar, offset(row), plotHeight) : compactColorbar(layout[key]?.colorbar);
 		if (bar) out[key] = { ...layout[key], colorbar: bar };
 	}
 	// the main legend is drawn by the page below the plot (see legendEntries), where it wraps and
@@ -249,8 +329,10 @@ export function compactFigure(figure: Figure): Figure {
 	const listed = new Set(legendEntries(figure).entries.map((entry) => entry.trace));
 	const data = figure.data?.map((source, index) => {
 		const trace = listed.has(index) ? { ...source, showlegend: false } : source;
-		const bar = compactColorbar(trace.colorbar);
-		const markerBar = compactColorbar(trace.marker?.colorbar);
+		const traceRow = rowOf((place) => place.kind === 'trace' && place.index === index);
+		const markerRow = rowOf((place) => place.kind === 'marker' && place.index === index);
+		const bar = traceRow >= 0 ? horizontalColorbar(trace.colorbar, offset(traceRow), plotHeight) : compactColorbar(trace.colorbar);
+		const markerBar = markerRow >= 0 ? horizontalColorbar(trace.marker?.colorbar, offset(markerRow), plotHeight) : compactColorbar(trace.marker?.colorbar);
 		if (!bar && !markerBar) return trace;
 		return { ...trace, ...(bar ? { colorbar: bar } : {}), ...(markerBar ? { marker: { ...trace.marker, colorbar: markerBar } } : {}) };
 	});
