@@ -400,6 +400,10 @@ bars lie horizontally below the plot, one row each, so the plot keeps the full w
 add to the height. On a touch screen the toolbar is hidden and a drag scrolls the page instead of
 zooming.
 
+An animation redraws its heatmaps on every frame, and a browser shows a new heatmap only once it
+has decoded its picture; until then the previous frame's heatmap stays underneath, so the figure
+does not flash to the page's background between frames.
+
 **Formulas.** A label that is one formula, `$...$`, is typeset as LaTeX: in titles, axis titles,
 legends, annotations and colour bars (plotly.js does not typeset hover labels). Text in a formula
 goes in `\text{...}`, e.g. `$\sigma_s\text{ [m}^2\text{]}$`: plotly.js takes the whole label as
