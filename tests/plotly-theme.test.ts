@@ -194,6 +194,24 @@ describe('compactFigure with the height of the figure', () => {
 		expect(layout.coloraxis3.colorbar).toEqual({ thickness: 10, xpad: 4 }); // not shown: as without a height
 	});
 
+	it('orders the colorbars of panels as they stood: rows from the top, each from the left', () => {
+		const bar = (x: number, y: number, text: string) => ({ colorbar: { x, y, title: { text } } });
+		const panels = {
+			data: ['coloraxis', 'coloraxis2', 'coloraxis3', 'coloraxis4', 'coloraxis10'].map((coloraxis) => ({ type: 'heatmap', coloraxis })),
+			layout: {
+				// numbered from left to right, as plasma-plots does: the left column first
+				coloraxis: bar(0.42, 0.78, 'top left'),
+				coloraxis2: bar(0.42, 0.25, 'bottom left'),
+				coloraxis3: bar(0.9, 0.79, 'top right'),
+				coloraxis4: bar(0.9, 0.25, 'bottom right'),
+				coloraxis10: {}, // beside the plot, at mid height: the row between
+			},
+		};
+		const layout = compactFigure(panels, { height: 800 }).layout!;
+		const order = ['coloraxis', 'coloraxis3', 'coloraxis10', 'coloraxis2', 'coloraxis4'].map((key) => layout[key].colorbar.y);
+		expect(order).toEqual([...order].sort((a, b) => b - a)); // each row lower than the one before
+	});
+
 	it('keeps thin vertical colorbars without a height', () => {
 		const layout = compactFigure(figure).layout!;
 		expect(layout.coloraxis.colorbar).toMatchObject({ thickness: 10 });
