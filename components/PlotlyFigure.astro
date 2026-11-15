@@ -65,6 +65,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 <script>
 	import { COMPACT_COLORBAR_PAD, COMPACT_COLORBAR_ROW, COMPACT_QUERY, PALETTE_SIZE, calmLayout, colorbarCount, compactFigure, hasControls, legendEntries, movableTitle, movableYTitle, paletteFigure, themeControls, titleText, webHints, type Figure } from '../lib/plotly-theme.ts';
 	import { captionParts, formulaOf, hasMath, mathjaxConfig } from '../lib/mathjax.ts';
+	import { steadyHeatmaps } from '../lib/steady-images.ts';
 	// MathJax 3 (TeX to SVG), served as a file of its own: a classic script that sets window.MathJax
 	// @ts-ignore: a URL import
 	import mathjaxUrl from 'mathjax/es5/tex-svg.js?url';
@@ -400,6 +401,8 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 			// with a figure object, Plotly reads the config from the object, not from a third argument
 			const height = compactHeight(plot, figure, thumbnail);
 			await Plotly.newPlot(plot, { ...themed(figure, thumbnail, new Set(), height), config: config(thumbnail) });
+			// an animation redraws its heatmaps on every frame: without a flash of the page between them
+			if (!thumbnail && figure.frames?.length) steadyHeatmaps(plot);
 			// plotly.js lays out axes of equal scale (scaleanchor) before MathJax has typeset the
 			// legend and titles, which then take another size: laid out again, they are equal
 			if (hasMath(figure)) await Plotly.redraw(plot);
