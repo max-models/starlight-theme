@@ -219,9 +219,21 @@ function colorbarPlaces(figure: Figure): ColorbarPlace[] {
 		if (marker.coloraxis) axes.add(marker.coloraxis);
 		else if (marker.showscale === true) places.push({ kind: 'marker', index });
 	});
+	// in reading order of where the colorbars stood: the rows of panels from the top, each row
+	// from the left (the colour axes are numbered as their colorbars stood from left to right)
+	const at = (key: string) => {
+		const bar = layout[key]?.colorbar ?? {};
+		return { x: typeof bar.x === 'number' ? bar.x : 1.02, y: typeof bar.y === 'number' ? bar.y : 0.5 };
+	};
+	const number = (key: string) => Number(key.slice('coloraxis'.length) || 1);
 	const axisPlaces: ColorbarPlace[] = Object.keys(layout)
 		.filter((key) => /^coloraxis\d*$/.test(key) && axes.has(key) && layout[key]?.showscale !== false)
-		.sort()
+		.sort((a, b) => {
+			const [pa, pb] = [at(a), at(b)];
+			// the same row when their centres are within a tenth of the figure's height
+			if (Math.abs(pa.y - pb.y) > 0.1) return pb.y - pa.y;
+			return pa.x - pb.x || number(a) - number(b);
+		})
 		.map((key) => ({ kind: 'axis', key }));
 	return [...axisPlaces, ...places];
 }
