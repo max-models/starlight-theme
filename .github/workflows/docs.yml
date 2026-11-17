@@ -379,10 +379,16 @@ jobs:
           npx starlight-gallery convert --strict
 
       # the project's wheel and, except on the release branch, its devel dependencies' (UV_NO_SOURCES)
+      # (a stable build of a release whose theme predates 0.13.0 has no starlight-pyodide: skipped)
       - name: Build the wheels of the live demos
         if: inputs.pyodide
         working-directory: ${{ inputs.project-dir }}/docs
-        run: npx starlight-pyodide wheels
+        run: |
+          if node -e "import('@max-models/starlight-theme/lib/pyodide.mjs').catch(() => process.exit(1))"; then
+            npx --no-install starlight-pyodide wheels
+          else
+            echo "the theme of this build has no starlight-pyodide: no wheels"
+          fi
 
       - name: Project-specific steps
         if: inputs.pre-build != ''
@@ -407,7 +413,10 @@ jobs:
           BASE: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && '/' || format('/{0}/', github.event.repository.name) }}${{ matrix.path }}
         run: |
           missing=0
-          for path in index.html $SMOKE_PATHS ${{ inputs.pyodide && 'pyodide/wheels.json' || '' }}; do
+          # the wheels of the live demos, where the smoke paths are checked
+          extra=""
+          if [ -n "$SMOKE_PATHS" ] && [ "${{ inputs.pyodide }}" = true ]; then extra=pyodide/wheels.json; fi
+          for path in index.html $SMOKE_PATHS $extra; do
             test -f "dist/$path" || { echo "missing dist/$path"; missing=1; }
           done
           grep -q "href=\"$BASE" dist/index.html || { echo "links do not use the base path $BASE"; missing=1; }
