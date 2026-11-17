@@ -101,13 +101,20 @@ jobs:
           THEME_REF: ${{ inputs.theme-ref }}
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          if [ -n "$THEME_REF" ]; then npm install --no-save --ignore-scripts --no-audit --no-fund "@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF"; fi
+          theme="@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF"
+          if [ -n "$THEME_REF" ]; then npm install --no-save --ignore-scripts --no-audit --no-fund "$theme"; fi
           version=$(node -e "import('@max-models/starlight-theme/lib/pyodide.mjs').then((m) => console.log(m.PYODIDE_VERSION))")
-          npm install --no-save --ignore-scripts --no-audit --no-fund "pyodide@$version"
+          # one install for both: a later --no-save install prunes the theme of an earlier one
+          if [ -n "$THEME_REF" ]; then
+            npm install --no-save --ignore-scripts --no-audit --no-fund "$theme" "pyodide@$version"
+          else
+            npm install --no-save --ignore-scripts --no-audit --no-fund "pyodide@$version"
+          fi
+          node -e "import('@max-models/starlight-theme/lib/pyodide.mjs')"
 
       - name: Build the wheels
         # the tool needs only the standard library (and uv)
-        run: DOCS_PYTHON=python3 npx starlight-pyodide wheels --out "$RUNNER_TEMP/wheels"
+        run: DOCS_PYTHON=python3 npx --no-install starlight-pyodide wheels --out "$RUNNER_TEMP/wheels"
 
       - name: Run the package in Pyodide
         env:
@@ -120,4 +127,4 @@ jobs:
           while IFS= read -r demo; do [ -n "$demo" ] && args+=(--demo "$demo"); done <<< "$DEMOS"
           [ -n "$PYTEST" ] && args+=(--pytest "../$PYTEST")
           [ -n "$SKIP" ] && args+=(--skip "$SKIP")
-          npx starlight-pyodide check "${args[@]}"
+          npx --no-install starlight-pyodide check "${args[@]}"
