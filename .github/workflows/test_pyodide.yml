@@ -1,0 +1,19 @@
+name: Test Pyodide
+
+# The reusable pyodide.yml on the example project: its wheel and methodcard's (a devel dependency)
+# in Pyodide, every module imported and the live demo of the example site run.
+
+on:
+  push:
+    branches: ["main", "devel"]
+  pull_request:
+    branches: ["main", "devel"]
+
+jobs:
+  pyodide:
+    uses: ./.github/workflows/pyodide.yml
+    with:
+      project-dir: example
+      # the theme of this checkout, not a release
+      theme-ref: ""
+      npm-lockfile: package-lock.json

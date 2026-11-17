@@ -7,12 +7,18 @@
 // layout.meta.web: its aspect ratio, a text alternative and a white plot area (see the README).
 // Labels that are one `$...$` formula are typeset with MathJax, loaded with the first figure that
 // has one, with the site's KaTeX macros (lib/mathjax.ts).
+// A `live` figure has no file: a script sends it its figure, and later new ones, as the detail of
+// an `mm:figure` event dispatched on (or inside) the frame, `.plotly-figure` (PyodideDemo does).
 import config from 'virtual:starlight-theme/config';
 import { withBase } from '../utils/base';
 
 export interface Props {
 	/** Site-root path of the figure JSON, e.g. "/gallery/sine-waves/fig-1.plotly.json". */
-	src: string;
+	src?: string;
+	/** No file: the figure comes, and is replaced, by `mm:figure` events (see above). */
+	live?: boolean;
+	/** The text until the figure is drawn; default "Loading figure…". */
+	status?: string;
 	/** A small, static preview without legend, titles and tick labels (the cards of the gallery). */
 	thumbnail?: boolean;
 	/** A text alternative; default: the figure's `alt` hint. */
@@ -29,7 +35,8 @@ export interface Props {
 	/** The poster for dark mode, e.g. drawn with light text; default: `poster` in both modes. */
 	posterDark?: string;
 }
-const { src, thumbnail = false, alt, aspect, caption, poster, posterDark } = Astro.props;
+const { src, live = false, status = 'Loading figure…', thumbnail = false, alt, aspect, caption, poster, posterDark } = Astro.props;
+if (!src && !live) throw new Error('PlotlyFigure needs a src, or live');
 const posterAlt = alt ?? caption ?? '';
 // a poster that cannot be loaded (e.g. not written by the build) leaves the "Loading" text
 const dropBroken = 'this.remove()';
@@ -39,7 +46,8 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 <figure class:list={['plotly-wrap', { thumbnail }]} aria-label={alt}>
 	<div
 		class:list={['plotly-figure', { thumbnail, 'has-aspect': !thumbnail && aspect, 'has-poster': poster }]}
-		data-plotly={withBase(src)}
+		data-plotly={src && !live ? withBase(src) : undefined}
+		data-plotly-live={live ? '' : undefined}
 		data-thumbnail={thumbnail ? '' : undefined}
 		data-math-macros={macros}
 		style={!thumbnail && aspect ? `--aspect: ${aspect}` : undefined}
@@ -57,7 +65,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		{poster && posterDark && (
 			<img class="plotly-poster light:sl-hidden" src={withBase(posterDark)} alt={posterAlt} loading="lazy" decoding="async" onerror={dropBroken} />
 		)}
-		<span class="plotly-status" aria-live="polite">Loading figure…</span>
+		<span class="plotly-status" aria-live="polite">{status}</span>
 	</div>
 	{caption && !thumbnail && <figcaption class="plotly-figcaption">{caption}</figcaption>}
 </figure>
@@ -367,16 +375,21 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		legend.replaceChildren(...items);
 	}
 
-	async function render(element: HTMLElement) {
+	async function fetchFigure(url: string): Promise<Figure> {
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+		return response.json();
+	}
+
+	// `given`: the figure of a live frame, else it is fetched from data-plotly
+	async function render(element: HTMLElement, given?: Figure) {
 		const thumbnail = element.hasAttribute('data-thumbnail');
 		try {
-			const [response, module] = await Promise.all([
-				fetch(element.dataset.plotly!),
+			const [figure, module] = await Promise.all([
+				given ?? fetchFigure(element.dataset.plotly!),
 				// @ts-ignore: plotly.js ships no types
 				import('plotly.js-dist-min'),
 			]);
-			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-			const figure: Figure = await response.json();
 			// a thumbnail shows no labels: no MathJax for it
 			if (!thumbnail && hasMath(figure)) {
 				await loadMathJax(JSON.parse(element.dataset.mathMacros ?? '{}')).catch(() => null); // without it, the labels as written
@@ -427,16 +440,37 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 	);
 	document.querySelectorAll<HTMLElement>('[data-plotly]').forEach((element) => observer.observe(element));
 
+	function refresh(item: (typeof rendered)[number]): Promise<unknown> {
+		const { element, figure, thumbnail, Plotly, hidden } = item;
+		syncCaption(element, figure, thumbnail);
+		const height = compactHeight(element, figure, thumbnail);
+		return Promise.resolve(Plotly.react(element, { ...themed(figure, thumbnail, hidden, height), config: config(thumbnail) }))
+			.then(() => hasMath(figure) && Plotly.redraw(element)) // as in render
+			.then(() => syncLegend(item));
+	}
 	const redraw = () => {
-		for (const item of rendered) {
-			const { element, figure, thumbnail, Plotly, hidden } = item;
-			syncCaption(element, figure, thumbnail);
-			const height = compactHeight(element, figure, thumbnail);
-			Promise.resolve(Plotly.react(element, { ...themed(figure, thumbnail, hidden, height), config: config(thumbnail) }))
-				.then(() => hasMath(figure) && Plotly.redraw(element)) // as in render
-				.then(() => syncLegend(item));
-		}
+		for (const item of rendered) refresh(item);
 	};
+
+	// A live frame: its first figure is rendered, the next ones replace it (one after another, so
+	// that a figure sent while the first one still loads plotly.js is not drawn twice).
+	const queues = new WeakMap<HTMLElement, Promise<unknown>>();
+	async function show(frame: HTMLElement, figure: Figure) {
+		const item = rendered.find((entry) => entry.element.closest('.plotly-figure') === frame);
+		if (!item) return render(frame, figure);
+		const legendChanged = (item.figure.data?.length ?? 0) !== (figure.data?.length ?? 0);
+		item.figure = figure;
+		if (legendChanged) item.hidden.clear();
+		if (hasMath(figure)) await loadMathJax(JSON.parse(frame.dataset.mathMacros ?? '{}')).catch(() => null);
+		return refresh(item);
+	}
+	document.addEventListener('mm:figure', (event) => {
+		const frame = (event.target as HTMLElement | null)?.closest?.<HTMLElement>('[data-plotly-live]');
+		const figure = (event as CustomEvent<Figure>).detail;
+		if (!frame || !figure) return;
+		const next = (queues.get(frame) ?? Promise.resolve()).then(() => show(frame, figure)).catch(() => undefined);
+		queues.set(frame, next);
+	});
 	// the theme toggle sets data-theme on <html>; a phone turned sideways can leave the compact width
 	new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 	compact.addEventListener('change', redraw);

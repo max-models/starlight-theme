@@ -1,0 +1,74 @@
+---
+title: Live demos
+description: Run the package in the reader's browser with Pyodide, with sliders that call it again.
+---
+
+import PyodideDemo from '@max-models/starlight-theme/components/PyodideDemo.astro';
+import code from '../../../components/leapfrog_demo.py?raw';
+
+`<PyodideDemo>` runs the project's Python in the reader's browser with
+[Pyodide](https://pyodide.org) (Python compiled to WebAssembly): nothing is installed and nothing
+is sent to a server. Move the sliders to step the oscillator again:
+
+<PyodideDemo
+	code={code}
+	controls={[
+		{ name: 'dt', label: 'Time step', min: 0.05, max: 1.5, step: 0.05, value: 0.3 },
+		{ name: 'periods', label: 'Periods', min: 1, max: 20, step: 1, value: 5 },
+	]}
+	caption="Leapfrog steps of x'' = -x against the exact cos(t)."
+/>
+
+## The Python
+
+The demo is a Python file next to the page, `src/components/<name>_demo.py`, with a function
+`run` that takes one keyword argument per control and returns a dict:
+
+- `figure`: a Plotly figure as a dict (`data`, `layout`), or a list of them, one per caption
+  (`captions={[...]}`); NumPy arrays are fine;
+- `numbers` (optional): `{label: value}`, shown below the figures;
+- `text` (optional): a sentence below them.
+
+Give every argument of `run` a default, the value its control starts at: the Pyodide check runs
+`run()` with them. Keep a run short, a fraction of a second: it blocks the page while it computes.
+
+## The page
+
+```mdx
+import PyodideDemo from '@max-models/starlight-theme/components/PyodideDemo.astro';
+import code from '../../../components/leapfrog_demo.py?raw';
+
+<PyodideDemo
+	code={code}
+	controls={[
+		{ name: 'dt', label: 'Time step', min: 0.05, max: 1.5, step: 0.05, value: 0.3 },
+		{ name: 'density', label: 'Density', min: 16, max: 21, value: 1e19, log: true, unit: 'm<sup>-3</sup>' },
+		{ name: 'gas', label: 'Gas', options: ['Ar', 'He'], value: 'Ar' },
+	]}
+	caption="What the figure shows."
+/>
+```
+
+A `log` slider moves the exponent: `min` and `max` are powers of ten, `value` the value itself.
+Further props: `packages` (more packages for micropip, e.g. `['plotly']`), `aspect` (width over
+height of the figures), `showCode` (the folded Python below the demo, default on).
+
+## The wheels
+
+The page installs the project's wheel, and on the dev site the wheels of its devel dependencies
+(`[tool.uv.sources]`), from `pyodide/wheels.json` of the site. `npx starlight-pyodide wheels` in
+`docs/` builds them into `public/pyodide/` (add that to `.gitignore`); in CI the docs workflow
+does it with `pyodide: true`. The other dependencies come from Pyodide's own packages (NumPy,
+SciPy, ...) or from PyPI, and must be pure Python.
+
+## The check
+
+The reusable workflow `pyodide.yml` checks that the package runs in Pyodide: it installs the
+wheels in Pyodide under Node, imports every module of the package, runs each demo's `run()` and,
+optionally, a test directory (`pytest: tests/portable`). Locally, in `docs/`:
+
+```sh
+npx starlight-pyodide wheels
+npm install --no-save pyodide@314.0.6
+npx starlight-pyodide check --pytest ../tests/portable
+```

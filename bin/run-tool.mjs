@@ -17,10 +17,10 @@ function findPython() {
 	return process.platform === 'win32' ? 'python' : 'python3';
 }
 
-export function runTool(name) {
+export function runTool(name, args = process.argv.slice(2)) {
 	const script = fileURLToPath(new URL(`../tools/${name}.py`, import.meta.url));
 	const python = findPython();
-	const result = spawnSync(python, [script, ...process.argv.slice(2)], { stdio: 'inherit' });
+	const result = spawnSync(python, [script, ...args], { stdio: 'inherit' });
 	if (result.error) {
 		console.error(`[${name}] could not run ${python}: ${result.error.message}`);
 		console.error('Set DOCS_PYTHON to the Python interpreter of the project.');

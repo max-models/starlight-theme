@@ -90,6 +90,10 @@ on:
         description: Shell commands run in the project root after the install, before the notebooks and gallery run (e.g. compiling kernels).
         type: string
         default: ""
+      pyodide:
+        description: Build the wheels the live demos (PyodideDemo) install, into docs/public/pyodide/ (starlight-pyodide wheels).
+        type: boolean
+        default: false
       pre-build:
         description: Shell commands run in the project root after the notebooks, before the build.
         type: string
@@ -374,6 +378,12 @@ jobs:
           $RUN npx starlight-gallery execute
           npx starlight-gallery convert --strict
 
+      # the project's wheel and, except on the release branch, its devel dependencies' (UV_NO_SOURCES)
+      - name: Build the wheels of the live demos
+        if: inputs.pyodide
+        working-directory: ${{ inputs.project-dir }}/docs
+        run: npx starlight-pyodide wheels
+
       - name: Project-specific steps
         if: inputs.pre-build != ''
         run: ${{ inputs.pre-build }}
@@ -397,7 +407,7 @@ jobs:
           BASE: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && '/' || format('/{0}/', github.event.repository.name) }}${{ matrix.path }}
         run: |
           missing=0
-          for path in index.html $SMOKE_PATHS; do
+          for path in index.html $SMOKE_PATHS ${{ inputs.pyodide && 'pyodide/wheels.json' || '' }}; do
             test -f "dist/$path" || { echo "missing dist/$path"; missing=1; }
           done
           grep -q "href=\"$BASE" dist/index.html || { echo "links do not use the base path $BASE"; missing=1; }
