@@ -1,6 +1,6 @@
 {
   "name": "@max-models/starlight-theme",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "description": "The shared Astro + Starlight docs setup of the max-models projects: config, header, palette, notebook pages.",
   "license": "MIT",
   "type": "module",
@@ -18,13 +18,15 @@
     "./styles/*": "./styles/*",
     "./package.json": "./package.json",
     "./routes/*": "./routes/*",
-    "./route-middleware": "./lib/route-middleware.ts"
+    "./route-middleware": "./lib/route-middleware.ts",
+    "./lib/pyodide.mjs": "./lib/pyodide.mjs"
   },
   "bin": {
     "starlight-check-mdx": "bin/check-mdx.mjs",
     "starlight-notebooks": "bin/notebooks.mjs",
     "starlight-gallery": "bin/gallery.mjs",
-    "starlight-theme-init": "bin/init.mjs"
+    "starlight-theme-init": "bin/init.mjs",
+    "starlight-pyodide": "bin/pyodide.mjs"
   },
   "files": [
     "index.ts",
@@ -68,6 +70,7 @@
   "devDependencies": {
     "@astrojs/starlight": "^0.42.6",
     "astro": "^7.3.8",
+    "pyodide": "314.0.6",
     "vitest": "^5.0.5"
   }
 }

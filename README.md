@@ -14,6 +14,8 @@ when it bumps its version.
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
+| `PyodideDemo`, `starlight-pyodide` | Live demos: the project's Python runs in the reader's browser with Pyodide, with sliders that call it again (see [Live demos](#live-demos)); `starlight-pyodide wheels` builds the wheels they install, `starlight-pyodide check` runs the package in Pyodide under Node |
+| `.github/workflows/pyodide.yml` | The reusable check that the package runs in Pyodide: imports every module, runs the demos and optionally a test directory |
 | `.github/workflows/docs.yml` | The reusable CI: install, notebooks, build, smoke test, deploy to GitHub Pages (the release and `devel` side by side) |
 | `renovate-preset.json` | A Renovate preset that bumps the theme in `docs/package.json` and the workflow together |
 
@@ -429,6 +431,55 @@ colour. Other colours and colormaps stay. A figure with `white_plot` keeps a whi
 and its own colours, for figures whose colours were chosen for a white background. A site can
 override the palette in its `customCss`, for both `:root` (dark) and `:root[data-theme='light']`.
 
+### Live demos
+
+`<PyodideDemo>` (from `@max-models/starlight-theme/components/PyodideDemo.astro`) runs a demo's
+Python in the reader's browser with [Pyodide](https://pyodide.org), version `PYODIDE_VERSION` of
+`lib/pyodide.mjs`. The Python, `docs/src/components/<name>_demo.py`, defines `run(**values)`,
+one keyword argument (with a default) per control, and returns
+`{"figure": <Plotly figure dict, or a list>, "numbers": {label: value}, "text": "..."}`:
+
+```mdx
+import PyodideDemo from '@max-models/starlight-theme/components/PyodideDemo.astro';
+import code from '../../../components/leapfrog_demo.py?raw';
+
+<PyodideDemo
+	code={code}
+	controls={[
+		{ name: 'dt', label: 'Time step', min: 0.05, max: 1.5, step: 0.05, value: 0.3 },
+		{ name: 'density', label: 'Density', min: 16, max: 21, value: 1e19, log: true, unit: 'm<sup>-3</sup>' },
+		{ name: 'gas', label: 'Gas', options: ['Ar', 'He'], value: 'Ar' },
+	]}
+	caption="What the figure shows."
+/>
+```
+
+The figures are live `PlotlyFigure`s (`<PlotlyFigure live />`, sent their figure by `mm:figure`
+events), in the site's palette and theme. The page installs the wheels listed in
+`pyodide/wheels.json` of the site: the project's, and except on the release build the devel
+dependencies of `[tool.uv.sources]`, which micropip cannot take from git. `pyodide: true` in the
+docs workflow builds them (`npx starlight-pyodide wheels` in `docs/` locally, into
+`public/pyodide/`, which belongs in `.gitignore`); everything else comes from Pyodide's packages
+or PyPI and must be pure Python. The example site's
+[Live demos](https://max-models.github.io/starlight-theme/dev/development/live-demos/) page
+documents the props.
+
+`.github/workflows/pyodide.yml` checks that the package runs there: it installs the wheels in
+Pyodide under Node, imports every module of the package (`skip: <regex>` leaves some out,
+`forbid` lists modules that must not load, default `cupy,mpi4py`), runs each demo's `run()` with
+its defaults and, with `pytest: tests/portable`, a test directory against the installed wheel:
+
+```yaml
+jobs:
+  pyodide:
+    uses: max-models/starlight-theme/.github/workflows/pyodide.yml@v0
+    with:
+      pytest: tests/portable
+```
+
+Locally, in `docs/`: `npx starlight-pyodide wheels`, `npm install --no-save pyodide@<version>`,
+`npx starlight-pyodide check`.
+
 ### Method cards
 
 A package whose numerical methods carry [method cards](https://github.com/max-models/methodcard)
@@ -484,7 +535,8 @@ Inputs: `extras` (default `docs`; e.g. `docs mpi`), `apt-packages` (e.g.
 PyVista scenes), `pre-notebooks` (shell commands before the notebooks and gallery run, e.g.
 compiling kernels), `pre-build` (shell commands before the build, e.g.
 tree-d-3d's examples), `smoke-paths`, `deploy`, `deploy-branch` (default `devel`), `stable-branch`,
-`python-version`, `node-version`, `project-dir`, `npm-lockfile`.
+`python-version`, `node-version`, `project-dir`, `npm-lockfile`, `pyodide` (build the wheels of the
+[live demos](#live-demos)).
 
 With `stable-branch: main`, a push to `main` or `devel` builds both branches and deploys the
 release at `<owner>.github.io/<repo>/` and `devel` at `<repo>/dev/`. The header then has a
@@ -542,7 +594,9 @@ Work happens on `devel`; `main` holds the releases.
 | `test_vitest.yml` | push / pull request to `main` or `devel` | tests of `defineDocs`, the plugin and `starlight-theme-init` |
 | `docs_site.yml` | push / pull request to `main` or `devel` | builds the example site with the reusable `docs.yml`; deploys it to <https://max-models.github.io/starlight-theme/> from `main` and to <https://max-models.github.io/starlight-theme/dev/> from `devel` |
 | `release.yml` | push to `main` | tags `v<version>` from `package.json` and creates a GitHub release with generated notes, unless it exists already; moves the major tag (`v0`) and reruns the docs of the sites on it |
+| `test_pyodide.yml` | push / pull request to `main` or `devel` | the reusable `pyodide.yml` on the example project and its live demo |
 | `docs.yml` | called by the projects | the reusable docs build |
+| `pyodide.yml` | called by the projects | the reusable Pyodide check |
 
 To release: bump `version` in `package.json` on `devel`, merge `devel` into `main`. The release
 workflow tags `vX.Y.Z`, moves the major tag (`v0`) to it and reruns the docs of every site whose

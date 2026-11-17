@@ -1,0 +1,123 @@
+name: Pyodide
+
+# The reusable check that a project runs in the browser: its wheel (and, except for the release
+# branch, the wheels of its [tool.uv.sources] devel dependencies) installed with micropip in
+# Pyodide under Node, every module imported, the live demos of the docs (docs/src/components/
+# *_demo.py) run with their defaults, and optionally a test directory run in Pyodide. The same
+# Pyodide version as the pages (lib/pyodide.mjs). A project calls it from its own
+# .github/workflows/pyodide.yml:
+#
+#   on:
+#     push: { branches: ["main", "devel"] }
+#     pull_request: { branches: ["main", "devel"] }
+#   jobs:
+#     pyodide:
+#       uses: max-models/starlight-theme/.github/workflows/pyodide.yml@v0
+#       with:
+#         pytest: tests/portable
+#
+# Note: starlight-pyodide check in docs/ runs the same check locally.
+
+on:
+  workflow_call:
+    secrets:
+      git-token:
+        description: A token that can read the project's private dependencies (git URLs on github.com).
+        required: false
+    inputs:
+      project-dir:
+        description: The project root (pyproject.toml and docs/), relative to the repository.
+        type: string
+        default: "."
+      theme-ref:
+        description: The theme release whose check runs (as in docs.yml), or empty for the lockfile's.
+        type: string
+        default: v0
+      npm-lockfile:
+        description: The npm lockfile, relative to the repository (for the cache).
+        type: string
+        default: docs/package-lock.json
+      python-version:
+        description: The Python that builds the wheels (Pyodide brings its own).
+        type: string
+        default: "3.12"
+      node-version:
+        type: string
+        default: "22"
+      demos:
+        description: The demos' Python files, relative to docs/, one per line; default every src/components/*_demo.py.
+        type: string
+        default: ""
+      pytest:
+        description: A test directory, relative to the project root, run in Pyodide against the wheels.
+        type: string
+        default: ""
+      forbid:
+        description: Modules no import may load in the browser, comma separated.
+        type: string
+        default: cupy,mpi4py
+      skip:
+        description: A regular expression of the project's modules not to import (they cannot run in the browser).
+        type: string
+        default: ""
+
+jobs:
+  pyodide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.project-dir }}/docs
+    env:
+      # the release branch and pull requests into it take the dependencies from PyPI, as docs.yml
+      UV_NO_SOURCES: ${{ (github.base_ref || github.ref_name) == 'main' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ inputs.python-version }}
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          check-latest: true
+          cache: npm
+          cache-dependency-path: ${{ inputs.npm-lockfile }}
+
+      - name: Let git read private repositories
+        env:
+          GIT_TOKEN: ${{ secrets['git-token'] }}
+        run: |
+          if [ -n "$GIT_TOKEN" ]; then
+            git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Install the theme and Pyodide
+        env:
+          THEME_REF: ${{ inputs.theme-ref }}
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          if [ -n "$THEME_REF" ]; then npm install --no-save --ignore-scripts --no-audit --no-fund "@max-models/starlight-theme@github:max-models/starlight-theme#$THEME_REF"; fi
+          version=$(node -e "import('@max-models/starlight-theme/lib/pyodide.mjs').then((m) => console.log(m.PYODIDE_VERSION))")
+          npm install --no-save --ignore-scripts --no-audit --no-fund "pyodide@$version"
+
+      - name: Build the wheels
+        # the tool needs only the standard library (and uv)
+        run: DOCS_PYTHON=python3 npx starlight-pyodide wheels --out "$RUNNER_TEMP/wheels"
+
+      - name: Run the package in Pyodide
+        env:
+          DEMOS: ${{ inputs.demos }}
+          PYTEST: ${{ inputs.pytest }}
+          FORBID: ${{ inputs.forbid }}
+          SKIP: ${{ inputs.skip }}
+        run: |
+          args=(--wheels "$RUNNER_TEMP/wheels" --forbid "$FORBID")
+          while IFS= read -r demo; do [ -n "$demo" ] && args+=(--demo "$demo"); done <<< "$DEMOS"
+          [ -n "$PYTEST" ] && args+=(--pytest "../$PYTEST")
+          [ -n "$SKIP" ] && args+=(--skip "$SKIP")
+          npx starlight-pyodide check "${args[@]}"

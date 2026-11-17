@@ -1,0 +1,301 @@
+---
+// A live demo: the project's Python runs in the reader's browser with Pyodide (WebAssembly), and
+// sliders or choices call it again. `code` is the demo's Python, imported as text
+// (`import code from './my_demo.py?raw'`); it defines `run(**values)`, which takes one keyword
+// argument per control and returns a dict with a Plotly figure (`figure`, or a list of them),
+// optional `numbers` ({label: value}) and an optional `text` (see RUN_DEMO in lib/pyodide.mjs).
+// The page installs the wheels the site serves (pyodide/wheels.json, written by
+// `starlight-pyodide wheels`), then `packages`. All demos of a page share one Python.
+import { Code } from '@astrojs/starlight/components';
+import { PYODIDE_CDN, WHEELS_JSON, formatValue, sliderPosition, type Control } from '../lib/pyodide.mjs';
+import { withBase } from '../utils/base';
+import PlotlyFigure from './PlotlyFigure.astro';
+
+export interface Props {
+	/** The demo's Python source, which defines `run`. */
+	code: string;
+	/** The sliders and choices, in order; each sets the keyword argument `name` of `run`. */
+	controls?: Control[];
+	/** Further packages for micropip (from Pyodide's own set or PyPI), after the site's wheels. */
+	packages?: string[];
+	/** Install the wheels of pyodide/wheels.json (the project and its devel dependencies). */
+	wheels?: boolean;
+	/** The caption of each figure `run` returns, in order; their number is the number of figures. */
+	captions?: string[];
+	/** The caption of a single figure. */
+	caption?: string;
+	/** Width over height of the figures, to reserve their space. */
+	aspect?: number;
+	/** Show the Python below the demo (folded). */
+	showCode?: boolean;
+	/** The name of the demo, for screen readers. */
+	label?: string;
+}
+
+const { code, controls = [], packages = [], wheels = true, captions, caption, aspect = 1.6, showCode = true, label = 'Live demo' } = Astro.props as Props;
+const figureCaptions = captions ?? [caption];
+const id = `mm-demo-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<section
+	class="mm-demo not-content"
+	aria-label={label}
+	data-code={code}
+	data-controls={JSON.stringify(controls)}
+	data-packages={JSON.stringify(packages)}
+	data-wheels={wheels ? withBase('/' + WHEELS_JSON) : undefined}
+	data-cdn={PYODIDE_CDN}
+>
+	<p class="mm-demo-status" role="status">Loading Python (about 10 s the first time)…</p>
+	{
+		controls.length > 0 && (
+			<form class="mm-demo-controls" onsubmit="return false">
+				{controls.map((control, i) => (
+					<label for={`${id}-${i}`}>
+						<span>
+							<span set:html={control.label} />{' '}
+							<output data-for={control.name}>{formatValue(control, control.value)}</output>
+							{control.unit && <span set:html={' ' + control.unit} />}
+						</span>
+						{control.options ? (
+							<select id={`${id}-${i}`} name={control.name} disabled>
+								{control.options.map((option) => (
+									<option value={String(option)} selected={String(option) === String(control.value)}>
+										{option}
+									</option>
+								))}
+							</select>
+						) : (
+							<input
+								type="range"
+								id={`${id}-${i}`}
+								name={control.name}
+								min={control.min}
+								max={control.max}
+								step={control.step ?? 'any'}
+								value={sliderPosition(control, control.value)}
+								disabled
+							/>
+						)}
+					</label>
+				))}
+			</form>
+		)
+	}
+	{figureCaptions.map((text) => <PlotlyFigure live status="The figure appears once Python runs." caption={text} aspect={aspect} />)}
+	<dl class="mm-demo-numbers" hidden></dl>
+	<p class="mm-demo-text" hidden></p>
+	{
+		showCode && (
+			<details class="mm-demo-code">
+				<summary>The Python of this demo</summary>
+				<Code code={code} lang="python" />
+			</details>
+		)
+	}
+</section>
+
+<script>
+	import { RUN_DEMO, controlValue, formatValue, parseResult, type Control } from '../lib/pyodide.mjs';
+
+	// One Python for the page: loaded with the first demo, the site's wheels installed once.
+	let python: Promise<any> | null = null;
+	const installed = new Map<string, Promise<void>>();
+
+	function loadPython(cdn: string): Promise<any> {
+		python ??= (async () => {
+			const { loadPyodide } = await import(/* @vite-ignore */ `${cdn}pyodide.mjs`);
+			const pyodide = await loadPyodide({ indexURL: cdn });
+			await pyodide.loadPackage('micropip');
+			return pyodide;
+		})();
+		return python;
+	}
+
+	// micropip installs these once per page, in the order given (a project's devel dependencies
+	// before the project, so that micropip does not take them from PyPI)
+	function install(pyodide: any, requirements: string[]): Promise<void> {
+		const key = JSON.stringify(requirements);
+		if (!installed.has(key)) {
+			pyodide.globals.set('_mm_requirements', pyodide.toPy(requirements));
+			installed.set(key, pyodide.runPythonAsync('import micropip\nawait micropip.install(list(_mm_requirements))'));
+		}
+		return installed.get(key)!;
+	}
+
+	async function wheelUrls(listing: string): Promise<string[]> {
+		const response = await fetch(listing);
+		if (!response.ok) throw new Error(`no wheels at ${listing} (${response.status}); run "npx starlight-pyodide wheels" in docs/`);
+		const { wheels } = await response.json();
+		return wheels.map((wheel: string) => new URL(wheel, new URL(listing, location.href)).href);
+	}
+
+	// the last line of a Python traceback: the exception and its message
+	const pythonError = (error: unknown) => String((error as Error)?.message ?? error).trim().split('\n').at(-1);
+
+	async function start(root: HTMLElement) {
+		const status = root.querySelector<HTMLElement>('.mm-demo-status')!;
+		const controls: Control[] = JSON.parse(root.dataset.controls ?? '[]');
+		const fields = controls.map((control) => root.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${control.name}"]`)!);
+		const frames = [...root.querySelectorAll<HTMLElement>('[data-plotly-live]')];
+		const numbers = root.querySelector<HTMLElement>('.mm-demo-numbers')!;
+		const text = root.querySelector<HTMLElement>('.mm-demo-text')!;
+
+		const pyodide = await loadPython(root.dataset.cdn!);
+		if (root.dataset.wheels) {
+			status.textContent = 'Installing the package and its dependencies…';
+			await install(pyodide, await wheelUrls(root.dataset.wheels));
+		}
+		const packages: string[] = JSON.parse(root.dataset.packages ?? '[]');
+		if (packages.length) await install(pyodide, packages);
+
+		status.textContent = 'Starting the demo…';
+		const namespace = pyodide.globals.get('dict')();
+		await pyodide.loadPackagesFromImports(root.dataset.code!);
+		await pyodide.runPythonAsync(root.dataset.code!, { globals: namespace });
+		await pyodide.runPythonAsync(RUN_DEMO, { globals: namespace });
+		const runJson = namespace.get('_demo_json');
+
+		const values = () => Object.fromEntries(controls.map((control, i) => [control.name, controlValue(control, fields[i].value)]));
+		const showValues = () => {
+			controls.forEach((control, i) => {
+				const output = root.querySelector<HTMLElement>(`output[data-for="${control.name}"]`);
+				if (output) output.textContent = formatValue(control, controlValue(control, fields[i].value));
+			});
+		};
+
+		// A run blocks the page: slider moves during it only mark the values stale, and the latest
+		// values run once it is done, after the page has drawn the slider.
+		let busy = false;
+		let stale = false;
+		const update = () => {
+			showValues();
+			if (busy) {
+				stale = true;
+				return;
+			}
+			busy = true;
+			stale = false;
+			requestAnimationFrame(() =>
+				setTimeout(() => {
+					const begin = performance.now();
+					try {
+						const result = parseResult(runJson(JSON.stringify(values())));
+						frames.forEach((frame, i) => {
+							if (result.figures[i]) frame.dispatchEvent(new CustomEvent('mm:figure', { detail: result.figures[i], bubbles: true }));
+						});
+						numbers.hidden = result.numbers.length === 0;
+						numbers.replaceChildren(
+							...result.numbers.map(([label, value]) => {
+								const item = document.createElement('div');
+								const term = document.createElement('dt');
+								const definition = document.createElement('dd');
+								term.innerHTML = label;
+								definition.textContent = value;
+								item.append(term, definition);
+								return item;
+							})
+						);
+						text.hidden = !result.text;
+						text.textContent = result.text;
+						status.textContent = `Computed in your browser in ${((performance.now() - begin) / 1000).toFixed(2)} s.`;
+					} catch (error) {
+						status.textContent = `The Python failed: ${pythonError(error)}`;
+					}
+					busy = false;
+					if (stale) update();
+				})
+			);
+		};
+		fields.forEach((field) => {
+			field.disabled = false;
+			field.addEventListener('input', update);
+		});
+		update();
+	}
+
+	// a demo starts when it comes near the screen, so a page that is only read loads no Python
+	const observer = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) continue;
+				observer.unobserve(entry.target);
+				const root = entry.target as HTMLElement;
+				start(root).catch((error) => {
+					root.querySelector<HTMLElement>('.mm-demo-status')!.textContent = `Could not start Python: ${pythonError(error)}`;
+				});
+			}
+		},
+		{ rootMargin: '400px' }
+	);
+	document.querySelectorAll<HTMLElement>('.mm-demo').forEach((root) => observer.observe(root));
+</script>
+
+<style>
+	.mm-demo {
+		margin: 1.5rem 0;
+		padding: 1rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.75rem;
+	}
+	.mm-demo-status {
+		margin: 0 0 0.75rem;
+		min-height: 1.5em;
+		color: var(--sl-color-gray-3);
+		font-size: var(--sl-text-sm);
+	}
+	.mm-demo-controls {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+		gap: 0.75rem 1.5rem;
+	}
+	.mm-demo-controls label {
+		display: grid;
+		gap: 0.25rem;
+		font-size: var(--sl-text-sm);
+	}
+	.mm-demo-controls output {
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+	}
+	.mm-demo-controls input[type='range'] {
+		width: 100%;
+		accent-color: var(--sl-color-accent);
+	}
+	.mm-demo-controls select {
+		padding: 0.25rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.25rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-text);
+	}
+	.mm-demo-numbers {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+		gap: 0.75rem;
+		margin: 0.5rem 0 0;
+	}
+	.mm-demo-numbers :global(div) {
+		margin: 0;
+	}
+	.mm-demo-numbers :global(dt) {
+		color: var(--sl-color-gray-3);
+		font-size: var(--sl-text-sm);
+	}
+	.mm-demo-numbers :global(dd) {
+		margin: 0;
+		font-size: var(--sl-text-lg);
+		font-variant-numeric: tabular-nums;
+	}
+	.mm-demo-text {
+		margin: 0.75rem 0 0;
+	}
+	.mm-demo-code {
+		margin-top: 1rem;
+	}
+	.mm-demo-code summary {
+		cursor: pointer;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+	}
+</style>
