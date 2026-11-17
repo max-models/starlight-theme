@@ -30,6 +30,7 @@ jobs:
       theme-ref: ""
       npm-lockfile: package-lock.json
       gallery: true
+      pyodide: true
       stable-branch: main
       smoke-paths: |
         getting-started/installation/index.html
@@ -46,3 +47,4 @@ jobs:
         examples/sine-waves/fig-1.plotly.json
         examples/damped-oscillator/fig-1.png
         examples/sine-waves/sine_waves.py
+        development/live-demos/index.html
