@@ -3,7 +3,8 @@
 ``starlight-pyodide wheels`` (run in ``docs/``) builds the project's wheel into
 ``docs/public/pyodide/`` and writes ``wheels.json`` there, the list of wheels the pages install
 with micropip, in order. Except on the release build (``UV_NO_SOURCES`` set, as the docs workflow
-sets it for the release branch), the dependencies that ``[tool.uv.sources]`` takes from git, e.g.
+sets it for the release branch), the dependencies that ``[tool.uv.sources]`` takes from git (and, in turn, those of their own
+``[tool.uv.sources]``), e.g.
 the devel branches of the max-models packages, are built as wheels too and listed before the
 project: micropip cannot install from git, and would otherwise take their last release from PyPI.
 The other dependencies come from Pyodide's own packages or PyPI when the page installs the wheels.
@@ -90,8 +91,11 @@ def build_wheel(source: Path, out: Path) -> Path:
     return wheel
 
 
-def build_git_wheel(name: str, source: dict, out: Path) -> Path:
-    """Clone a git source (branch, tag or rev; optionally a subdirectory) and build its wheel."""
+def build_git_wheel(name: str, source: dict, out: Path) -> tuple[Path, dict]:
+    """Clone a git source (branch, tag or rev; optionally a subdirectory) and build its wheel.
+
+    Returns the wheel and the source's ``pyproject.toml``, whose own git sources are followed.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         checkout = Path(tmp) / name
         ref = source.get("branch") or source.get("tag")
@@ -118,7 +122,10 @@ def build_git_wheel(name: str, source: dict, out: Path) -> Path:
                 ["git", "-C", str(checkout), "checkout", "--quiet", "FETCH_HEAD"],
                 check=True,
             )
-        return build_wheel(checkout / source.get("subdirectory", ""), out)
+        root = checkout / source.get("subdirectory", "")
+        return build_wheel(root, out), tomllib.loads(
+            (root / "pyproject.toml").read_text()
+        )
 
 
 def build(project: Path, out: Path, sources: bool) -> list[str]:
@@ -128,11 +135,24 @@ def build(project: Path, out: Path, sources: bool) -> list[str]:
     out.mkdir(parents=True)
     wheels = []
     if sources:
-        for name, source in git_sources(pyproject):
-            print(
-                f"[pyodide] {name} from {source['git']} ({source.get('branch') or source.get('tag') or source.get('rev') or 'default branch'})"
+        # the git sources of the dependencies too (e.g. cunumpy's devel branch for mpifield's),
+        # each once; the deepest ones first
+        queue, seen = list(git_sources(pyproject)), set()
+        while queue:
+            name, source = queue.pop(0)
+            if name in seen:
+                continue
+            seen.add(name)
+            ref = (
+                source.get("branch")
+                or source.get("tag")
+                or source.get("rev")
+                or "default branch"
             )
-            wheels.append(build_git_wheel(name, source, out).name)
+            print(f"[pyodide] {name} from {source['git']} ({ref})")
+            wheel, dependency = build_git_wheel(name, source, out)
+            wheels.insert(0, wheel.name)
+            queue += git_sources(dependency)
     wheels.append(build_wheel(project, out).name)
     (out / WHEELS_JSON).write_text(json.dumps({"wheels": wheels}, indent=2) + "\n")
     print(f"[pyodide] wrote {out / WHEELS_JSON}: {', '.join(wheels)}")
