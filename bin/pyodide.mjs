@@ -17,7 +17,7 @@
 //   --skip REGEX        modules of the project not to import (e.g. "\.backends\.jax")
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { PYODIDE_VERSION, RUN_DEMO, WHEELS_JSON, parseResult } from '../lib/pyodide.mjs';
+import { PYODIDE_VERSION, RUN_DEMO, parseResult } from '../lib/pyodide.mjs';
 import { runTool } from './run-tool.mjs';
 
 // Node's report of an uncaught error starts with the throwing source line, inside Pyodide one
@@ -123,7 +123,7 @@ def _mm_import_all(distribution_name, skip):
 
 async function check(args) {
 	const opts = options(args);
-	const listing = join(opts.wheels, WHEELS_JSON);
+	const listing = join(opts.wheels, 'wheels.json');
 	if (!existsSync(listing)) throw new Error(`no ${listing}: run "npx starlight-pyodide wheels" first`);
 	const { wheels } = JSON.parse(readFileSync(listing, 'utf8'));
 
