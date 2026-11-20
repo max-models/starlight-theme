@@ -408,7 +408,9 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 			// plotted into an inner box: Plotly sizes a plot to the border box of its element, which
 			// would overflow the padding of the frame
 			const plot = document.createElement('div');
-			plot.className = 'plotly-plot';
+			// not-content: Starlight's space between the markdown's siblings (margin-top: 1rem)
+			// would push Plotly's second and third SVG layers, with the shapes, below its axes
+			plot.className = 'plotly-plot not-content';
 			element.replaceChildren(plot);
 			syncCaption(plot, figure, thumbnail);
 			// with a figure object, Plotly reads the config from the object, not from a third argument
