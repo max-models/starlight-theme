@@ -15,6 +15,8 @@
 //   --pytest DIR        a test directory to run in Pyodide (e.g. ../tests/portable)
 //   --forbid A,B        modules no import may load (default cupy,mpi4py)
 //   --skip REGEX        modules of the project not to import (e.g. "\.backends\.jax")
+//   --packages A,B      Pyodide packages to load first, for optional dependencies that the
+//                       project's modules, demos or tests import (e.g. numpy)
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { PYODIDE_VERSION, RUN_DEMO, parseResult } from '../lib/pyodide.mjs';
@@ -30,7 +32,7 @@ process.on('uncaughtException', (error) => {
 const [command, ...rest] = process.argv.slice(2);
 
 function options(args) {
-	const out = { wheels: 'public/pyodide', demo: [], pytest: '', forbid: 'cupy,mpi4py', skip: '' };
+	const out = { wheels: 'public/pyodide', demo: [], pytest: '', forbid: 'cupy,mpi4py', skip: '', packages: '' };
 	for (let i = 0; i < args.length; i++) {
 		const key = args[i].replace(/^--/, '');
 		if (!(key in out) || i + 1 >= args.length) throw new Error(`unknown option or missing value: ${args[i]}`);
@@ -111,7 +113,8 @@ def _mm_import_all(distribution_name, skip):
         if hasattr(package, "__path__"):
             names += [info.name for info in pkgutil.walk_packages(package.__path__, top + ".", onerror=lambda name: None)]
         for name in names:
-            if ".tests" in name or ".test_" in name or (skip and skip.search(name)):
+            # a __main__ runs its command line when imported
+            if ".tests" in name or ".test_" in name or name.endswith(".__main__") or (skip and skip.search(name)):
                 continue
             try:
                 importlib.import_module(name)
@@ -137,7 +140,8 @@ async function check(args) {
 	if (pyodide.version !== PYODIDE_VERSION) {
 		throw new Error(`pyodide ${pyodide.version} is installed, the pages load ${PYODIDE_VERSION}: npm install --no-save pyodide@${PYODIDE_VERSION}`);
 	}
-	await pyodide.loadPackage(opts.pytest ? ['micropip', 'pytest'] : ['micropip']);
+	const packages = ['micropip', ...opts.packages.split(',').filter(Boolean)];
+	await pyodide.loadPackage(opts.pytest ? [...packages, 'pytest'] : packages);
 
 	let failures = 0;
 	const fail = (message) => {
