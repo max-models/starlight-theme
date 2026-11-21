@@ -465,9 +465,11 @@ or PyPI and must be pure Python. The example site's
 documents the props.
 
 `.github/workflows/pyodide.yml` checks that the package runs there: it installs the wheels in
-Pyodide under Node, imports every module of the package (`skip: <regex>` leaves some out,
-`forbid` lists modules that must not load, default `cupy,mpi4py`), runs each demo's `run()` with
-its defaults and, with `pytest: tests/portable`, a test directory against the installed wheel:
+Pyodide under Node, imports every module of the package but `__main__` (`skip: <regex>` leaves
+more out, `forbid` lists modules that must not load, default `cupy,mpi4py`, and `packages: numpy`
+loads Pyodide packages first, for optional dependencies the modules or tests import), runs each
+demo's `run()` with its defaults and, with `pytest: tests/portable`, a test directory against the
+installed wheel:
 
 ```yaml
 jobs:
