@@ -60,6 +60,10 @@ on:
         description: A regular expression of the project's modules not to import (they cannot run in the browser).
         type: string
         default: ""
+      packages:
+        description: Pyodide packages to load first, comma separated, for optional dependencies the modules, demos or tests import (e.g. numpy).
+        type: string
+        default: ""
 
 jobs:
   pyodide:
@@ -122,9 +126,11 @@ jobs:
           PYTEST: ${{ inputs.pytest }}
           FORBID: ${{ inputs.forbid }}
           SKIP: ${{ inputs.skip }}
+          PACKAGES: ${{ inputs.packages }}
         run: |
           args=(--wheels "$RUNNER_TEMP/wheels" --forbid "$FORBID")
           while IFS= read -r demo; do [ -n "$demo" ] && args+=(--demo "$demo"); done <<< "$DEMOS"
           [ -n "$PYTEST" ] && args+=(--pytest "../$PYTEST")
           [ -n "$SKIP" ] && args+=(--skip "$SKIP")
+          [ -n "$PACKAGES" ] && args+=(--packages "$PACKAGES")
           npx --no-install starlight-pyodide check "${args[@]}"
