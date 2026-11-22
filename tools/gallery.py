@@ -234,8 +234,13 @@ def convert_example(settings: GallerySettings, example: Example, order: int) -> 
     base = f"/{settings.section}/{example.slug}"
     assets = []
     for figure in figures:
-        shutil.copy2(outdir / figure["file"], public / figure["file"])
-        assets.append({"kind": figure["kind"], "src": f"{base}/{figure['file']}"})
+        asset = {"kind": figure["kind"], "src": f"{base}/{figure['file']}"}
+        for name in (figure["file"], figure.get("dark")):
+            if name and (outdir / name).exists():
+                shutil.copy2(outdir / name, public / name)
+        if figure.get("dark") and (outdir / figure["dark"]).exists():
+            asset["dark"] = f"{base}/{figure['dark']}"
+        assets.append(asset)
 
     parts = []
     if example.body:
@@ -245,7 +250,8 @@ def convert_example(settings: GallerySettings, example: Example, order: int) -> 
         if asset["kind"] == "plotly":
             parts.append(f'<PlotlyFigure src="{asset["src"]}" />')
         else:
-            parts.append(f'<NotebookImage src="{asset["src"]}" alt={{{alt}}} />')
+            dark = f' dark="{asset["dark"]}"' if "dark" in asset else ""
+            parts.append(f'<NotebookImage src="{asset["src"]}"{dark} alt={{{alt}}} />')
     parts.append("## Source code")
     parts.append(_code_fence(example.code, example.path.name))
     if stdout.strip():

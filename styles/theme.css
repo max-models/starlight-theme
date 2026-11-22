@@ -5,6 +5,9 @@
  */
 
 @import '@fontsource-variable/source-serif-4/opsz.css';
+@import '@fontsource-variable/source-sans-3/wght.css';
+@import '@fontsource-variable/source-sans-3/wght-italic.css';
+@import '@fontsource-variable/source-code-pro/wght.css';
 
 :root {
 	/* dark mode */
@@ -32,8 +35,13 @@
 	--sl-color-gray-7: #0d1c27;
 	--sl-color-black: #0a1823;
 
-	--sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	/* one type family, bundled with the theme so every reader sees the same: Source Sans for the
+	   text, Source Serif for the headings, Source Code Pro for code */
+	--sl-font: 'Source Sans 3 Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--sl-font-mono: 'Source Code Pro Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	--mm-font-headings: 'Source Serif 4 Variable', 'Iowan Old Style', Charter, Georgia, serif;
+	/* the longest line of running text */
+	--mm-measure: 72ch;
 
 	/* the data palette of figures (PlotlyFigure), after Okabe and Ito: colour-blind safe, in the
 	   order of their palette, lighter in dark mode */
@@ -128,6 +136,69 @@ h1#_top,
 .sl-link-card:hover {
 	background: transparent;
 	border-color: var(--sl-color-text-accent);
+}
+
+/*
+ * Running text at a readable length. The column itself spans the space between the sidebar and
+ * "On this page" (below), so code, figures and tables still get the full width.
+ */
+.sl-markdown-content > :is(p, ul, ol, dl, blockquote, details, .sl-heading-wrapper, h2, h3, h4, h5, h6) {
+	max-inline-size: var(--mm-measure);
+}
+
+/* numbered figure captions, as in a paper (PlotlyFigure, NotebookImage) */
+.sl-markdown-content {
+	counter-reset: mm-figure;
+}
+.mm-caption {
+	max-inline-size: var(--mm-measure);
+	margin-top: 0.5rem;
+	color: var(--sl-color-gray-2);
+	font-size: var(--sl-text-sm);
+	line-height: 1.5;
+}
+.mm-caption::before {
+	counter-increment: mm-figure;
+	content: 'Figure ' counter(mm-figure) '. ';
+	font-weight: 600;
+	color: var(--sl-color-text);
+}
+
+/* the sidebar's group labels small and letter-spaced, so the pages under them stand out */
+.sidebar-content .group-label .large {
+	font-size: var(--sl-text-xs);
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+
+/*
+ * Code blocks: the language in the top corner (it gives way to the copy button on hover); the
+ * frames themselves are set in lib/plugin.ts (expressiveCode).
+ */
+.expressive-code .frame:not(.has-title):not(.is-terminal) pre[data-language]::before {
+	content: attr(data-language);
+	position: absolute;
+	top: 0.2rem;
+	right: 0.75rem;
+	font-family: var(--__sl-font);
+	font-size: var(--sl-text-xs);
+	letter-spacing: 0.05em;
+	color: var(--sl-color-gray-3);
+	pointer-events: none;
+}
+/* room for it above the first line, which may reach the right edge */
+.expressive-code .frame:not(.has-title):not(.is-terminal) pre[data-language]:not([data-language='plaintext'], [data-language='txt']) {
+	padding-top: 1.25rem;
+}
+.expressive-code .frame:hover pre[data-language]::before,
+.expressive-code .frame:focus-within pre[data-language]::before {
+	visibility: hidden;
+}
+.expressive-code pre[data-language='plaintext']::before,
+.expressive-code pre[data-language='txt']::before {
+	display: none;
 }
 
 /* the current page in the sidebar: a rule on its left in the accent, not a filled block */

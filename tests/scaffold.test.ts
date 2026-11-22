@@ -107,7 +107,8 @@ describe('scaffold', () => {
 		expect(index).toContain('link: /grids/getting-started/installation/');
 		expect(index).toContain('heroInstall: "pip install git+https://github.com/max-models/grids"');
 		expect(index).toContain('<StartHere />');
-		expect(index).toContain('<Card title="Examples"');
+		expect(index).not.toContain('CardGrid'); // prose and a code example, not a grid of cards
+		expect(index).toContain('import grids');
 		expect(JSON.parse(files['renovate.json']).extends).toContain('github>max-models/starlight-theme:renovate-preset');
 	});
 

@@ -102,10 +102,35 @@ def test_runner_collects_figures_and_output(tmp_path):
     assert [f["kind"] for f in manifest["figures"]] == ["plotly", "png"]
     assert manifest["stdout"] == "hello\n"
     assert (outdir / "fig-2.png").read_bytes().startswith(b"\x89PNG")
+    # and its dark copy, for dark mode
+    assert manifest["figures"][1]["dark"] == "fig-2.dark.png"
+    assert (outdir / "fig-2.dark.png").read_bytes().startswith(b"\x89PNG")
     assert json.loads((outdir / "fig-1.plotly.json").read_text())["data"][0]["y"] == [
         3,
         4,
     ]
+
+
+def test_darken_turns_ink_light_and_paper_dark_but_keeps_the_data():
+    pytest.importorskip("matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_hex
+
+    runner = _load("gallery_runner")
+    fig, ax = plt.subplots()
+    (data,) = ax.plot([1, 2], color="#0072b2")
+    (black,) = ax.plot([1, 2], color="black")
+    ax.set_title("title")
+    runner.darken(fig)
+    assert to_hex(fig.get_facecolor()) == runner.DARK_PAPER
+    assert to_hex(ax.get_facecolor()) == runner.DARK_PAPER
+    assert to_hex(ax.title.get_color()) == runner.DARK_INK
+    assert to_hex(black.get_color()) == runner.DARK_INK
+    assert to_hex(data.get_color()) == "#0072b2"
+    plt.close(fig)
 
 
 def test_runner_fails_without_a_figure(tmp_path):
@@ -133,10 +158,15 @@ def test_convert_writes_pages_and_index(project):
     outdir = project.cache / example.slug
     outdir.mkdir(parents=True)
     (outdir / "fig-1.plotly.json").write_text('{"data": [], "layout": {}}')
+    (outdir / "fig-2.png").write_bytes(b"light")
+    (outdir / "fig-2.dark.png").write_bytes(b"dark")
     (outdir / "manifest.json").write_text(
         json.dumps(
             {
-                "figures": [{"kind": "plotly", "file": "fig-1.plotly.json"}],
+                "figures": [
+                    {"kind": "plotly", "file": "fig-1.plotly.json"},
+                    {"kind": "png", "file": "fig-2.png", "dark": "fig-2.dark.png"},
+                ],
                 "stdout": "hello\n",
             }
         )
@@ -155,6 +185,11 @@ def test_convert_writes_pages_and_index(project):
     assert '```python title="first_example.py"' in page
     assert "Printed output" in page
     assert (project.public / "first-example" / "fig-1.plotly.json").exists()
+    assert (
+        '<NotebookImage src="/examples/first-example/fig-2.png" '
+        'dark="/examples/first-example/fig-2.dark.png"'
+    ) in page
+    assert (project.public / "first-example" / "fig-2.dark.png").read_bytes() == b"dark"
     assert (project.public / "first-example" / "first_example.py").exists()
 
     index = (project.content / "index.mdx").read_text()

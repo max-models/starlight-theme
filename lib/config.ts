@@ -104,6 +104,8 @@ export interface DocsOptions {
 	release?: { pypi?: string } | false;
 	/** The share image for link previews (`<base>/og.png`). Default true. */
 	shareImage?: boolean;
+	/** The colours of a first visit: `'light'` (default) or `'auto'`, the reader's system setting. */
+	colorScheme?: 'light' | 'auto';
 	/** Merged over the Starlight config (plugins are appended to the theme's). */
 	starlight?: Partial<StarlightUserConfig>;
 	/**
@@ -174,6 +176,7 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			license: readLicense(root, source, sourceBranch),
 			shareImage: options.shareImage,
 			math: options.math,
+			colorScheme: options.colorScheme,
 		}),
 	];
 	if (pkg) {

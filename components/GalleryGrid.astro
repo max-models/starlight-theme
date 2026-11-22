@@ -13,7 +13,7 @@ export interface Item {
 	/** Heading of the group the example belongs to; empty for none. */
 	group: string;
 	/** The first figure of the example, if it has run. */
-	thumbnail: { kind: 'plotly' | 'png'; src: string } | null;
+	thumbnail: { kind: 'plotly' | 'png'; src: string; dark?: string } | null;
 	/** Text in place of a missing thumbnail. Default "not run". */
 	placeholder?: string;
 }
@@ -43,7 +43,12 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 							<a class="gallery-card" href={withBase(item.href)}>
 								<div class="gallery-thumb">
 									{item.thumbnail?.kind === 'plotly' && <PlotlyFigure src={item.thumbnail.src} thumbnail />}
-									{item.thumbnail?.kind === 'png' && <img src={withBase(item.thumbnail.src)} alt="" loading="lazy" />}
+									{item.thumbnail?.kind === 'png' && (
+										<img src={withBase(item.thumbnail.src)} alt="" loading="lazy" class:list={{ 'has-dark': item.thumbnail.dark }} />
+									)}
+									{item.thumbnail?.kind === 'png' && item.thumbnail.dark && (
+										<img src={withBase(item.thumbnail.dark)} alt="" loading="lazy" class="is-dark" />
+									)}
 									{!item.thumbnail && <span class="gallery-empty">{item.placeholder ?? 'not run'}</span>}
 								</div>
 								<div class="gallery-text">
@@ -142,6 +147,13 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 		height: 100%;
 		object-fit: contain;
 		background: white;
+	}
+	.gallery-thumb img.is-dark {
+		background: none;
+	}
+	:global([data-theme='dark']) .gallery-thumb img.has-dark,
+	:global([data-theme='light']) .gallery-thumb img.is-dark {
+		display: none;
 	}
 	.gallery-empty {
 		color: var(--sl-color-gray-3);

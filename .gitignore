@@ -12,3 +12,5 @@ example/docs/public/examples/
 example/docs/src/content/docs/examples/*.mdx
 # the wheels of the live demos, built by starlight-pyodide wheels
 example/docs/public/pyodide/
+playwright-report/
+test-results/

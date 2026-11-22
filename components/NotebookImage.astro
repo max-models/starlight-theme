@@ -1,23 +1,42 @@
 ---
-// A static image output of a notebook cell, stored under public/ (written by the starlight-notebooks tool).
+// A static image: a notebook cell's output or a gallery script's matplotlib figure, stored under
+// public/ (written by the starlight-notebooks and starlight-gallery tools). With `dark`, that image
+// is shown in dark mode instead; with `caption`, a numbered caption below it.
 export interface Props {
 	/** Site-root path of the image, e.g. "/tutorials/first-steps/1.png". */
 	src: string;
+	/** Site-root path of the image for dark mode. */
+	dark?: string;
 	alt?: string;
+	caption?: string;
 }
-const { src, alt = 'Notebook output' } = Astro.props;
-const resolved = import.meta.env.BASE_URL.replace(/\/$/, '') + src;
+const { src, dark, alt = 'Notebook output', caption } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<img class="notebook-image" src={resolved} alt={alt} loading="lazy" />
+<figure class="notebook-figure">
+	<img class:list={['notebook-image', { 'has-dark': dark }]} src={base + src} alt={alt} loading="lazy" />
+	{dark && <img class="notebook-image is-dark" src={base + dark} alt={alt} loading="lazy" />}
+	{caption && <figcaption class="mm-caption">{caption}</figcaption>}
+</figure>
 
 <style>
+	.notebook-figure {
+		margin-block: 1rem;
+	}
 	.notebook-image {
 		display: block;
 		max-width: 100%;
 		height: auto;
-		margin-block: 1rem;
 		border-radius: 0.25rem;
 		background: white;
+	}
+	.notebook-image.is-dark {
+		background: none;
+	}
+	/* one of the two in each mode (Starlight's sl-hidden classes lose to the display above) */
+	:global([data-theme='dark']) .notebook-image.has-dark,
+	:global([data-theme='light']) .notebook-image.is-dark {
+		display: none;
 	}
 </style>

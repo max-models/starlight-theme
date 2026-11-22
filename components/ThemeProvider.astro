@@ -1,0 +1,43 @@
+---
+// Starlight's ThemeProvider, with the paper palette for a first visit: the light colours unless the
+// site sets `colorScheme: 'auto'` (then the reader's system setting, as in Starlight). Starlight's
+// theme menu stores '' for "Auto", so a reader who picks it keeps it; only a reader who has never
+// chosen (nothing stored) gets the site's default. The theme plugin replaces ThemeProvider with this one.
+import { Icon } from '@astrojs/starlight/components';
+import theme from 'virtual:starlight-theme/config';
+---
+
+{/* inlined, as Starlight's, so the page never flashes in the other colours */}
+<script is:inline define:vars={{ colorScheme: theme.colorScheme }}>
+	window.StarlightThemeProvider = (() => {
+		const storage = typeof localStorage !== 'undefined' ? localStorage : undefined;
+		if (colorScheme === 'light' && storage && storage.getItem('starlight-theme') === null) {
+			storage.setItem('starlight-theme', 'light');
+		}
+		const storedTheme = storage && storage.getItem('starlight-theme');
+		const theme = storedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script>
+
+<template id="theme-icons">
+	<Icon name="sun" class="light" />
+	<Icon name="moon" class="dark" />
+	<Icon name="laptop" class="auto" />
+</template>
