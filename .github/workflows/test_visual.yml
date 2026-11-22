@@ -1,0 +1,60 @@
+name: Test look
+
+# Screenshots of the example site (tests/visual/look.spec.ts), compared with the committed ones in
+# tests/visual/screenshots/. The notebooks and scripts are not executed, as when the images were
+# taken. On a failure the report with the differences is an artifact of the run; after a deliberate
+# change, update the images with `npm run test:visual -- --update-snapshots`.
+
+on:
+  push:
+    branches:
+      - main
+      - devel
+  pull_request:
+    branches:
+      - main
+      - devel
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          check-latest: true
+          cache: npm
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install the npm packages and the browser
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Install the example project
+        working-directory: example
+        run: uv sync --extra docs
+
+      - name: Build the example site
+        run: npm run build
+
+      - name: Compare the screenshots
+        run: npm run test:visual
+
+      - name: Show where the screenshots differ
+        if: failure()
+        run: node tests/visual/diff-summary.mjs
+
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: look-report
+          path: |
+            playwright-report/
+            test-results/

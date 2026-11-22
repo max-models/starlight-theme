@@ -1,10 +1,11 @@
 ---
-// The "Start here" grid of a home page: a link card for each link in the header (the `nav` of
-// defineDocs, with its `description`), so the two stay in step. Cards in the slot come after them.
+// The "Start here" list of a home page: a link for each link in the header (the `nav` of
+// defineDocs, with its `description`), so the two stay in step; a plain list, as a paper's table of
+// contents, not a grid of cards. Items in the slot (`<li><a href="...">Title</a> what it is</li>`)
+// come after them.
 //
 //     import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
 //     <StartHere exclude={['Development']} />
-import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import theme from 'virtual:starlight-theme/config';
 import { withBase } from '../utils/base';
 
@@ -17,7 +18,46 @@ const { exclude = [] } = Astro.props;
 const links = theme.nav.filter((link) => !exclude.includes(link.label));
 ---
 
-<CardGrid>
-	{links.map((link) => <LinkCard title={link.label} href={withBase(link.link)} description={link.description} />)}
+<ul class="start-here not-content">
+	{
+		links.map((link) => (
+			<li>
+				<a href={withBase(link.link)}>{link.label}</a>
+				{link.description && <span>{link.description}</span>}
+			</li>
+		))
+	}
 	<slot />
-</CardGrid>
+</ul>
+
+<style>
+	.start-here {
+		max-inline-size: var(--mm-measure, 72ch);
+		margin: 1rem 0 0;
+		padding: 0;
+		list-style: none;
+		border-top: 1px solid var(--sl-color-hairline);
+	}
+	.start-here > :global(li) {
+		display: grid;
+		grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+		gap: 0.25rem 1.5rem;
+		margin: 0;
+		padding: 0.75rem 0;
+		border-bottom: 1px solid var(--sl-color-hairline);
+		color: var(--sl-color-gray-2);
+	}
+	.start-here :global(a) {
+		font-weight: 600;
+		color: var(--sl-color-text-accent);
+		text-decoration: none;
+	}
+	.start-here :global(a:hover) {
+		text-decoration: underline;
+	}
+	@media (max-width: 40rem) {
+		.start-here > :global(li) {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>
