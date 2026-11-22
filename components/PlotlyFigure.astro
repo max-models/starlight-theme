@@ -67,7 +67,7 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		)}
 		<span class="plotly-status" aria-live="polite">{status}</span>
 	</div>
-	{caption && !thumbnail && <figcaption class="plotly-figcaption">{caption}</figcaption>}
+	{caption && !thumbnail && <figcaption class="plotly-figcaption mm-caption">{caption}</figcaption>}
 </figure>
 
 <script>
@@ -488,20 +488,11 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 		width: 100%;
 		height: 100%;
 	}
-	.plotly-figcaption {
-		margin-top: 0.5rem;
-		color: var(--sl-color-gray-2);
-		font-size: var(--sl-text-sm);
-		text-align: center;
-	}
+	/* a figure on the page itself, as in a paper: no box around it */
 	.plotly-figure {
 		display: flex;
 		flex-direction: column;
 		min-height: 24rem;
-		border: 1px solid var(--sl-color-hairline);
-		border-radius: 0.75rem;
-		padding: 0.5rem;
-		background: color-mix(in srgb, var(--sl-color-gray-5, #888) 8%, transparent);
 	}
 	.plotly-figure.has-aspect {
 		aspect-ratio: var(--aspect);
@@ -514,7 +505,6 @@ const macros = Object.keys(config.math?.macros ?? {}).length ? JSON.stringify(co
 	@media (max-width: 40rem) {
 		.plotly-figure {
 			min-height: 20rem;
-			padding: 0.25rem;
 		}
 		.plotly-figure.has-aspect {
 			aspect-ratio: min(var(--aspect), 1.1);

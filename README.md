@@ -9,8 +9,8 @@ when it bumps its version.
 |---|---|
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
-| `theme()` Starlight plugin | The palette, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
-| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the link cards of a home page; `MethodCard`: one method card (see [Method cards](#method-cards)); `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
+| `theme()` Starlight plugin | The palette and the serif headings, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
+| `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the list of links of a home page; `MethodCard`: one method card (see [Method cards](#method-cards)); `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
 | `starlight-check-mdx` | Compiles every MDX page in seconds, to find a broken conversion before the build |
@@ -96,15 +96,16 @@ Other options:
 | `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
 | `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page, also in the formulas of Plotly figures |
 | `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; without one the title has the max-models wave before it, `false` for neither. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
-| `release` | The badge of the latest release in the hero: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
+| `release` | The line naming the latest release above the hero's title: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
 | `methodcard` | `true` or `{ title, exclude }`: the [method cards](#method-cards) of the package, on its API pages and a catalogue page |
 | `shareImage` | `false` for no share image (`<base>/og.png`, the header picture with the title and description, for link previews) |
+| `colorScheme` | The colours of a first visit: `'light'` (default, the paper palette) or `'auto'`, the reader's system setting. Readers can still pick any of the three in the theme menu |
 
 and `starlight` / `astro` for anything else, merged over the result, e.g.
 `astro: { redirects: { '/tutorials/': '/guides/' } }` (site-root paths; `defineDocs` adds the base
 path to the targets, which Astro does not) or `starlight: { plugins: [...] }`.
 A nav link is "current" on every page under its first path segment, or under `section`, and its
-`description` shows in the `<StartHere />` grid of the home page.
+`description` shows in the `<StartHere />` list of the home page.
 
 `docs/src/content.config.ts`:
 
@@ -158,9 +159,9 @@ the frontmatter shows a command to copy below the buttons:
 heroInstall: pip install git+https://github.com/max-models/simgeometry
 ```
 
-`<StartHere />` turns the header links into link cards, with the `description` of each nav link,
+`<StartHere />` turns the header links into a list of links, with the `description` of each nav link,
 so the two stay in step (and point into `/<repo>/dev/` in the dev build). `exclude` leaves some out,
-and cards in its slot come after them:
+and list items in its slot come after them:
 
 ```mdx
 import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
@@ -168,11 +169,24 @@ import StartHere from '@max-models/starlight-theme/components/StartHere.astro';
 ## Start here
 
 <StartHere exclude={['Development']}>
-  <LinkCard title="Quickstart" href="/simgeometry/getting-started/quickstart/" />
+  <li><a href="/simgeometry/getting-started/quickstart/">Quickstart</a> The shortest way in.</li>
 </StartHere>
 ```
 
 `starlight-theme-init` writes a home page with both, and nav links with descriptions.
+
+### Type, text width, figures and code
+
+- Type: Source Sans 3 for the text, Source Serif 4 for the headings, Source Code Pro for code,
+  bundled with the theme (fontsource), so every reader sees the same.
+- Running text stops at `--mm-measure` (72ch); code blocks, figures and tables take the full width
+  of the column. A site can set `--mm-measure` in its own `customCss`.
+- Figures with a caption (`<PlotlyFigure caption="..." />`, `<NotebookImage caption="..." />`)
+  are numbered on each page, "Figure 1.", as in a paper; figures have no box around them.
+- Code blocks have a hairline frame and the language in the corner; shell commands get a plain
+  frame, not a terminal window. A site's own `starlight.expressiveCode` replaces these settings.
+- The gallery saves a dark copy of each matplotlib figure (`fig-N.dark.png`: black text and lines
+  turned light, white backgrounds dark, the data's colours kept), shown in dark mode.
 
 ### Footer, citation and share image
 
@@ -579,6 +593,13 @@ npm test                                     # npm run test:js (vitest) and test
 ```
 
 `DOCS_CHANNEL=dev npm run build` builds the example as the dev site at `/starlight-theme/dev/`.
+
+`npm run test:visual` compares screenshots of the example site (home, installation and gallery, light
+and dark, and a phone) with the ones in `tests/visual/screenshots/` (Playwright; CI runs it in
+`test_visual.yml`). Build the site first without executing the notebooks and scripts (`npm run
+notebooks -w example/docs -- clean` and `npm run gallery -w example/docs -- clean` undo that), as CI
+does. After a deliberate change of the look, `npm run test:visual -- --update-snapshots` writes new
+images: look at them, and commit them with the change, so the review shows the difference.
 
 To try a change in a real project before a release, install the checkout into its `docs/` as a
 copy, `npm install --install-links ../../starlight-theme` (rerun it after each change, and go

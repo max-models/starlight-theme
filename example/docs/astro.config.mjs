@@ -9,7 +9,7 @@ export default defineDocs({
 	title: 'starlight-theme',
 	description: 'The shared docs setup of the max-models projects, shown on a small example package.',
 	pythonPackage: 'example_pkg',
-	// the descriptions show in the <StartHere /> grid of the home page
+	// the descriptions show in the <StartHere /> list of the home page
 	nav: [
 		{ label: 'Getting started', link: '/getting-started/installation/', description: 'Use the theme in a project.' },
 		{ label: 'Tutorials', link: '/tutorials/', description: 'A converted notebook.' },

@@ -13,7 +13,7 @@ export interface Item {
 	/** Heading of the group the example belongs to; empty for none. */
 	group: string;
 	/** The first figure of the example, if it has run. */
-	thumbnail: { kind: 'plotly' | 'png'; src: string } | null;
+	thumbnail: { kind: 'plotly' | 'png'; src: string; dark?: string } | null;
 	/** Text in place of a missing thumbnail. Default "not run". */
 	placeholder?: string;
 }
@@ -43,7 +43,12 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 							<a class="gallery-card" href={withBase(item.href)}>
 								<div class="gallery-thumb">
 									{item.thumbnail?.kind === 'plotly' && <PlotlyFigure src={item.thumbnail.src} thumbnail />}
-									{item.thumbnail?.kind === 'png' && <img src={withBase(item.thumbnail.src)} alt="" loading="lazy" />}
+									{item.thumbnail?.kind === 'png' && (
+										<img src={withBase(item.thumbnail.src)} alt="" loading="lazy" class:list={{ 'has-dark': item.thumbnail.dark }} />
+									)}
+									{item.thumbnail?.kind === 'png' && item.thumbnail.dark && (
+										<img src={withBase(item.thumbnail.dark)} alt="" loading="lazy" class="is-dark" />
+									)}
 									{!item.thumbnail && <span class="gallery-empty">{item.placeholder ?? 'not run'}</span>}
 								</div>
 								<div class="gallery-text">
@@ -85,7 +90,7 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 		margin-bottom: 1.5rem;
 		padding: 0.55rem 0.9rem;
 		border: 1px solid var(--sl-color-hairline-light);
-		border-radius: 999px;
+		border-radius: 0.25rem;
 		background: var(--sl-color-bg-inline-code);
 		color: var(--sl-color-text);
 		font: inherit;
@@ -97,9 +102,9 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 	}
 	.gallery-heading {
 		margin: 2rem 0 1rem;
+		font-family: var(--mm-font-headings);
 		font-size: var(--sl-text-xl);
 		font-weight: 600;
-		letter-spacing: -0.01em;
 	}
 	.gallery-grid {
 		display: grid;
@@ -119,20 +124,14 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 		height: 100%;
 		overflow: hidden;
 		border: 1px solid var(--sl-color-hairline);
-		border-radius: 0.9rem;
-		background: color-mix(in srgb, var(--sl-color-gray-5, #888) 8%, transparent);
+		border-radius: 0.25rem;
 		color: inherit;
 		text-decoration: none;
-		transition:
-			transform 0.18s ease,
-			border-color 0.18s ease,
-			box-shadow 0.18s ease;
+		transition: border-color 0.15s ease;
 	}
 	.gallery-card:hover,
 	.gallery-card:focus-visible {
-		transform: translateY(-3px);
 		border-color: var(--sl-color-text-accent);
-		box-shadow: 0 10px 28px -12px color-mix(in srgb, var(--sl-color-text-accent) 55%, transparent);
 	}
 	.gallery-thumb {
 		display: flex;
@@ -141,13 +140,20 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 		aspect-ratio: 16 / 10;
 		overflow: hidden;
 		border-bottom: 1px solid var(--sl-color-hairline);
-		background: radial-gradient(120% 120% at 0% 0%, var(--sl-color-accent-low), transparent 70%);
+		background: var(--sl-color-gray-7);
 	}
 	.gallery-thumb img {
 		width: 100%;
 		height: 100%;
 		object-fit: contain;
 		background: white;
+	}
+	.gallery-thumb img.is-dark {
+		background: none;
+	}
+	:global([data-theme='dark']) .gallery-thumb img.has-dark,
+	:global([data-theme='light']) .gallery-thumb img.is-dark {
+		display: none;
 	}
 	.gallery-empty {
 		color: var(--sl-color-gray-3);
@@ -178,10 +184,6 @@ const groups = [...new Set(items.map((item) => item.group))].map((group) => ({
 	@media (prefers-reduced-motion: reduce) {
 		.gallery-card {
 			transition: none;
-		}
-		.gallery-card:hover,
-		.gallery-card:focus-visible {
-			transform: none;
 		}
 	}
 </style>

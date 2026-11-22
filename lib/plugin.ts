@@ -75,6 +75,11 @@ export interface ThemeOptions {
 	shareImage?: boolean;
 	/** The KaTeX macros of the site (`math.macros` of defineDocs), also for the formulas in Plotly figures. */
 	math?: { macros?: Record<string, string> };
+	/**
+	 * The colours a first visit sees: `'light'` (the default, the paper palette) or `'auto'`, the
+	 * reader's system setting. The theme menu still offers all three.
+	 */
+	colorScheme?: 'light' | 'auto';
 }
 
 /** What `virtual:starlight-theme/config` exports. */
@@ -101,6 +106,8 @@ export interface ThemeConfig {
 	site: { title: string; description: string };
 	/** The KaTeX macros, for the formulas of PlotlyFigure (typeset with MathJax). */
 	math: { macros: Record<string, string> };
+	/** The colours of a first visit (components/ThemeProvider.astro). */
+	colorScheme: 'light' | 'auto';
 }
 
 const VIRTUAL_ID = 'virtual:starlight-theme/config';
@@ -144,6 +151,7 @@ export function themeConfig(options: ThemeOptions): ThemeConfig {
 		family: { name: `${owner} projects`, href: `https://${owner}.github.io/` },
 		site: { title: '', description: '' },
 		math: { macros: options.math?.macros ?? {} },
+		colorScheme: options.colorScheme ?? 'light',
 	};
 }
 
@@ -179,12 +187,32 @@ export default function theme(options: ThemeOptions): StarlightPlugin {
 						'@max-models/starlight-theme/styles/theme.css',
 						...(starlight.customCss ?? []),
 					],
+					// quiet code frames: hairline borders, no shadow, and shell commands in a plain
+					// frame rather than a terminal window with three dots; a site's own settings win
+					...(starlight.expressiveCode === false
+						? {}
+						: {
+								expressiveCode: {
+									defaultProps: { overridesByLang: { 'bash,console,sh,shell,shellscript,zsh': { frame: 'code' } } },
+									styleOverrides: {
+										borderRadius: '0.25rem',
+										borderColor: 'var(--sl-color-hairline-light)',
+										frames: {
+											frameBoxShadowCssValue: 'none',
+											editorActiveTabIndicatorTopColor: 'transparent',
+											editorTabBarBorderBottomColor: 'var(--sl-color-hairline-light)',
+										},
+									},
+									...(typeof starlight.expressiveCode === 'object' ? starlight.expressiveCode : {}),
+								},
+							}),
 					components: {
 						Header: '@max-models/starlight-theme/components/Header.astro',
 						Banner: '@max-models/starlight-theme/components/Banner.astro',
 						Hero: '@max-models/starlight-theme/components/Hero.astro',
 						SiteTitle: '@max-models/starlight-theme/components/SiteTitle.astro',
 						Footer: '@max-models/starlight-theme/components/Footer.astro',
+						ThemeProvider: '@max-models/starlight-theme/components/ThemeProvider.astro',
 						...starlight.components,
 					},
 				});
