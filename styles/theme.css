@@ -1,22 +1,25 @@
 /*
- * Palette: a warm paper/ink swap with a teal accent, shared by the max-models sites.
- * A site can override any of these variables in its own customCss, which loads after this file.
+ * Palette: a warm paper/ink swap with a muted teal accent, shared by the max-models sites, and a
+ * serif for the headings, as in a printed paper. A site can override any of these variables in its
+ * own customCss, which loads after this file.
  */
+
+@import '@fontsource-variable/source-serif-4/opsz.css';
 
 :root {
 	/* dark mode */
-	--sl-color-accent-low: #0d3a38;
-	--sl-color-accent: #63eee6;
-	--sl-color-accent-high: #b6f5f1;
+	--sl-color-accent-low: #16302e;
+	--sl-color-accent: #7cc4b9;
+	--sl-color-accent-high: #cde6e1;
 	--sl-color-white: #eeeadd;
 	--sl-color-text: #eeeadd;
-	--sl-color-text-accent: #63eee6;
+	--sl-color-text-accent: #7cc4b9;
 	--sl-color-text-invert: #07131d;
 	--sl-color-bg: #07131d;
 	--sl-color-bg-nav: #07131d;
 	--sl-color-bg-sidebar: #07131d;
 	--sl-color-bg-inline-code: #0b1a25;
-	--sl-color-bg-accent: #63eee6;
+	--sl-color-bg-accent: #7cc4b9;
 	--sl-color-hairline-light: rgba(238, 234, 221, 0.2);
 	--sl-color-hairline: rgba(238, 234, 221, 0.14);
 	--sl-color-hairline-shade: #07131d;
@@ -30,6 +33,7 @@
 	--sl-color-black: #0a1823;
 
 	--sl-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--mm-font-headings: 'Source Serif 4 Variable', 'Iowan Old Style', Charter, Georgia, serif;
 
 	/* the data palette of figures (PlotlyFigure), after Okabe and Ito: colour-blind safe, in the
 	   order of their palette, lighter in dark mode */
@@ -90,6 +94,50 @@
 /* rectangular, low-radius buttons */
 .sl-link-button {
 	border-radius: 0.25rem;
+}
+
+/* headings in the serif: the page title and the sections of a page */
+h1#_top,
+.sl-markdown-content :is(h1, h2) {
+	font-family: var(--mm-font-headings);
+	font-weight: 600;
+	letter-spacing: 0;
+}
+
+/*
+ * Starlight's cards without the coloured icon tiles (orange, purple, green, red in turn): a
+ * hairline box, the icon in the accent colour.
+ */
+.card,
+.card:nth-child(n) {
+	--sl-card-border: transparent;
+	--sl-card-bg: transparent;
+	border-color: var(--sl-color-hairline-light);
+	background-color: transparent;
+	padding: 1.25rem 1.5rem;
+}
+.card .icon {
+	padding: 0;
+	color: var(--sl-color-text-accent);
+}
+.sl-link-card {
+	border-color: var(--sl-color-hairline-light);
+	border-radius: 0.25rem;
+	box-shadow: none;
+}
+.sl-link-card:hover {
+	background: transparent;
+	border-color: var(--sl-color-text-accent);
+}
+
+/* the current page in the sidebar: a rule on its left in the accent, not a filled block */
+.sidebar-content [aria-current='page'],
+.sidebar-content [aria-current='page']:hover,
+.sidebar-content [aria-current='page']:focus {
+	color: var(--sl-color-text-accent);
+	background-color: transparent;
+	box-shadow: inset 2px 0 0 var(--sl-color-text-accent);
+	border-radius: 0;
 }
 
 /*

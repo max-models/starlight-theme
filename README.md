@@ -9,7 +9,7 @@ when it bumps its version.
 |---|---|
 | `starlight-theme-init` | Sets up the docs of a project: `docs/`, the workflow, a Renovate config, Makefile targets |
 | `defineDocs()` | The whole `astro.config.mjs`: base path, KaTeX math (with macros), the theme, the API reference (starlight-pydocs) linked to the sibling projects, the link check, edit and GitHub links |
-| `theme()` Starlight plugin | The palette, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
+| `theme()` Starlight plugin | The palette and the serif headings, a header with the wave logo, a row of section links, a stable/dev switch and a projects menu, the home page hero, a footer naming the project family, a "Cite" page, the KaTeX styles, the favicon and a share image. Used by `defineDocs`, or on its own in a site with its own config |
 | `components/` | `NotebookHeader`, `NotebookImage`, `RawHtml`, `PyVistaScene`: what the converted notebook pages use; `GalleryGrid`, `GalleryHeader`, `PlotlyFigure`: the gallery's (and the grid of the notebooks); `StartHere`: the link cards of a home page; `MethodCard`: one method card (see [Method cards](#method-cards)); `Header`, `Banner`, `Hero`, `SiteTitle`, `Footer`: Starlight's, replaced |
 | `starlight-notebooks` | Executes `tutorials/*.ipynb` (or another directory) and converts them into MDX pages (`tools/notebooks.py`, optionally on several MPI ranks) |
 | `starlight-gallery` | Runs example scripts (matplotlib or Plotly) and turns them into a gallery: a grid of cards and one page per script with its docstring, interactive figure and code (`tools/gallery.py`) |
@@ -96,7 +96,7 @@ Other options:
 | `launch` | `['colab', 'binder']`: buttons on the notebook pages that run the notebook there |
 | `math` | `{ macros: { '\\vect': '\\boldsymbol{#1}' } }`: KaTeX macros for every page, also in the formulas of Plotly figures |
 | `logo` | Starlight's logo, e.g. `{ src: './src/assets/logo.svg' }`; without one the title has the max-models wave before it, `false` for neither. The favicon is the max-models one unless `public/favicon.svg` exists or `starlight.favicon` is set |
-| `release` | The badge of the latest release in the hero: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
+| `release` | The line naming the latest release above the hero's title: from the GitHub releases by default, from PyPI with `{ pypi: 'distribution-name' }`, `false` for none |
 | `methodcard` | `true` or `{ title, exclude }`: the [method cards](#method-cards) of the package, on its API pages and a catalogue page |
 | `shareImage` | `false` for no share image (`<base>/og.png`, the header picture with the title and description, for link previews) |
 

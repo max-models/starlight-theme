@@ -60,14 +60,14 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 				{figure && <Fragment set:html={figure.replace('<svg ', '<svg class="hero-figure" ')} />}
 				{pattern && (
 					<svg class="streamlines" viewBox={`0 0 ${pattern.width} ${pattern.height}`} preserveAspectRatio="xMidYMid slice">
-						<g fill="none" stroke-width="1.5">
+						<g fill="none" stroke-width="1">
 							{pattern.lines.map((line) => (
 								<path d={line.d} stroke-opacity={line.opacity} />
 							))}
 						</g>
 						<circle class="cylinder" cx={pattern.circle.cx} cy={pattern.circle.cy} r={pattern.circle.r} />
 						{pattern.dots.map((dot) => (
-							<circle class="tracer" r="4">
+							<circle class="tracer" r="2.5">
 								<animateMotion
 									dur={`${dot.duration}s`}
 									begin={`-${dot.offset}s`}
@@ -102,7 +102,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 			{
 				release && (
 					<a class="release" href={release.href}>
-						<span>Latest release</span> v{release.version}
+						Release {release.version}
 					</a>
 				)
 			}
@@ -175,9 +175,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 		width: 100vw;
 		overflow: hidden;
 		border-bottom: 1px solid var(--sl-color-hairline);
-		background:
-			radial-gradient(ellipse at 75% 50%, var(--sl-color-accent-low), transparent 70%),
-			var(--sl-color-bg);
+		background: var(--sl-color-bg);
 	}
 
 	.streamlines,
@@ -193,7 +191,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	}
 
 	.streamlines {
-		stroke: var(--sl-color-accent);
+		stroke: color-mix(in srgb, var(--sl-color-accent) 70%, var(--sl-color-gray-4));
 	}
 
 	/* the tones of a plasma_plots.hero figure: s- strokes, f- fills */
@@ -211,11 +209,11 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	.cylinder {
 		fill: var(--sl-color-bg);
 		stroke: var(--sl-color-accent);
-		stroke-width: 2.5;
+		stroke-width: 1.5;
 	}
 
 	.tracer {
-		fill: var(--sl-color-accent-high);
+		fill: var(--sl-color-accent);
 	}
 
 	.side {
@@ -242,10 +240,10 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	}
 
 	h1 {
+		font-family: var(--mm-font-headings);
 		font-size: clamp(var(--sl-text-4xl), calc(0.25rem + 6vw), var(--sl-text-6xl));
 		line-height: var(--sl-line-height-headings);
-		font-weight: 700;
-		letter-spacing: -0.02em;
+		font-weight: 600;
 		color: var(--sl-color-white);
 	}
 
@@ -262,21 +260,14 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 	}
 
 	.release {
-		padding: 0.15rem 0.75rem;
-		border: 1px solid var(--sl-color-accent);
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--sl-color-bg) 70%, transparent);
+		font-family: var(--__sl-font-mono);
 		font-size: var(--sl-text-sm);
-		font-weight: 600;
-		color: var(--sl-color-text-accent);
+		color: var(--sl-color-gray-3);
 		text-decoration: none;
 	}
-	.release span {
-		font-weight: 400;
-		color: var(--sl-color-gray-2);
-	}
 	.release:hover {
-		background: var(--sl-color-accent-low);
+		color: var(--sl-color-text-accent);
+		text-decoration: underline;
 	}
 
 	.install {
@@ -347,7 +338,7 @@ const backgrounds = background ? ('dark' in background ? [background.dark, backg
 		.streamlines,
 		.backdrop :global(.hero-figure),
 		.backdrop-image {
-			opacity: 1;
+			opacity: 0.8;
 			mask-image: linear-gradient(to right, transparent 15%, #000 55%);
 		}
 	}
