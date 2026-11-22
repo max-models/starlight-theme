@@ -8,7 +8,14 @@ export default defineConfig({
 	testDir: 'tests/visual',
 	snapshotPathTemplate: '{testDir}/screenshots/{arg}{ext}',
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
-	use: { baseURL: 'http://localhost:4329' },
+	use: {
+		baseURL: 'http://localhost:4329',
+		// text drawn the same on every machine, whatever its fontconfig says: no hinting, grey
+		// anti-aliasing instead of subpixel, and sRGB colours
+		launchOptions: {
+			args: ['--font-render-hinting=none', '--disable-lcd-text', '--disable-font-subpixel-positioning', '--force-color-profile=srgb'],
+		},
+	},
 	expect: {
 		// the fonts are bundled, so only anti-aliasing differs between machines
 		toHaveScreenshot: { maxDiffPixelRatio: 0.01 },

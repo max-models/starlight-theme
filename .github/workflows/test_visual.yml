@@ -46,6 +46,10 @@ jobs:
       - name: Compare the screenshots
         run: npm run test:visual
 
+      - name: Show where the screenshots differ
+        if: failure()
+        run: node tests/visual/diff-summary.mjs
+
       - name: Keep the report
         if: failure()
         uses: actions/upload-artifact@v7
