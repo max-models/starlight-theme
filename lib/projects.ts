@@ -17,7 +17,7 @@ export const projects: Project[] = [
 	{ repo: 'tree-d-3d', title: 'tree-d-3d', description: 'Barnes-Hut trees and fast multipole methods for charged particles', pythonPackage: 'tree_d_3d' },
 	{ repo: 'plasmacoll', title: 'plasmacoll', description: 'Monte Carlo collisions with neutral gases', pythonPackage: 'plasmacoll' },
 	{ repo: 'picnic', title: 'picnic', description: 'Particle-in-cell tools for negative ions and other charged particles', pythonPackage: 'picnic' },
-	{ repo: 'wellbalanced', title: 'wellbalanced', description: 'Global (0D) and 1D fluid models of low-temperature plasmas', pythonPackage: 'wellbalanced' },
+	{ repo: 'carafe', title: 'carafe', description: 'Global (0D) and 1D fluid models of low-temperature plasmas', pythonPackage: 'carafe' },
 	{ repo: 'freeofcharge', title: 'freeofcharge', description: 'Neutral beams in tokamak plasmas', pythonPackage: 'freeofcharge' },
 	{ repo: 'mhd-sandbox', title: 'mhd-sandbox', description: 'Finite-volume ideal MHD on a periodic 2D grid', pythonPackage: 'mhd_sandbox' },
 	{ repo: 'plasma-plots', title: 'plasma-plots', description: 'Plots of labeled xarray plasma output', pythonPackage: 'plasma_plots', distribution: 'plasma-plots' },
