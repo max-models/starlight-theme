@@ -26,6 +26,7 @@ import {
 	exportCards,
 	findPython,
 	gitRoot,
+	linksNumerics,
 	methodcardIntegration,
 	numericsSidebar,
 	type MethodcardConfig,
@@ -70,7 +71,8 @@ export interface DocsOptions {
 	/**
 	 * Method cards (the methodcard package): a "Numerics" section on each method's API page (the
 	 * griffe extension) and a catalogue page at `<base>/numerics/`, linked from the sidebar; with
-	 * `pages`, one page per module and a sidebar group. Needs `pythonPackage` and methodcard
+	 * `pages`, one page per module and a sidebar group, unless `sidebar` links to the pages
+	 * (`/numerics/<module>/`) itself, where they belong. Needs `pythonPackage` and methodcard
 	 * installed in the project's Python.
 	 */
 	methodcard?: boolean | MethodcardOptions;
@@ -244,7 +246,8 @@ export default function defineDocs(options: DocsOptions): AstroUserConfig {
 			modules: cardModules(cards, methodcard.labels),
 		};
 	}
-	const withNumerics: Sidebar = numerics ? [...options.sidebar, ...numericsSidebar(numerics)] : options.sidebar;
+	// a sidebar that links to the card pages itself places them; else they get a group of their own
+	const withNumerics: Sidebar = numerics && !linksNumerics(options.sidebar) ? [...options.sidebar, ...numericsSidebar(numerics)] : options.sidebar;
 	const sidebar: Sidebar =
 		pkg && !containsPlaceholder(options.sidebar)
 			? [...withNumerics, { label: 'API reference', collapsed: true, items: [pydocsSidebarGroup] }]

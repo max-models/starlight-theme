@@ -212,6 +212,19 @@ export function numericsSidebar(config: Pick<MethodcardConfig, 'title' | 'pages'
 	return [{ label: config.title, items: [overview, ...modules] }];
 }
 
+/**
+ * Whether a sidebar links to the method-card pages itself (a `link` under `/numerics/`, at any
+ * depth): the site then places them where they belong, and the theme adds no "Numerics" entry.
+ */
+export function linksNumerics(items: unknown): boolean {
+	if (!Array.isArray(items)) return false;
+	return items.some((item) => {
+		if (typeof item !== 'object' || item === null) return false;
+		const { link, items: children } = item as { link?: unknown; items?: unknown };
+		return (typeof link === 'string' && /^\/numerics(\/|$)/.test(link)) || linksNumerics(children);
+	});
+}
+
 /** The Astro integration: the virtual module with the cards and the catalogue route. */
 export function methodcardIntegration(config: MethodcardConfig): AstroIntegration {
 	return {

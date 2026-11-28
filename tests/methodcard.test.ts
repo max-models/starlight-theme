@@ -11,7 +11,7 @@ import {
 	inlineHtml,
 	moduleLabel,
 	moduleSlug,
-	numericsSidebar, excluded, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
+	numericsSidebar, excluded, linksNumerics, exportCards, findPython, gitRoot, methodcardIntegration, orderText, shortName, VIRTUAL_MODULE } from '../lib/methodcard.ts';
 
 vi.mock('@astrojs/starlight', () => ({ default: (options: unknown) => ({ name: 'starlight', options }) }));
 vi.mock('starlight-pydocs', () => ({
@@ -167,6 +167,14 @@ describe('helpers', () => {
 				],
 			},
 		]);
+	});
+
+	it('sees a sidebar that links to the card pages itself', () => {
+		expect(linksNumerics(undefined)).toBe(false);
+		expect(linksNumerics([{ label: 'Guide', link: '/guide/' }, { autogenerate: { directory: 'examples' } }])).toBe(false);
+		expect(linksNumerics([{ label: 'Elsewhere', link: '/numerical/' }])).toBe(false);
+		expect(linksNumerics([{ label: 'Field', items: [{ label: 'Mesh', items: [{ label: 'Mesh', link: '/numerics/mesh/' }] }] }])).toBe(true);
+		expect(linksNumerics([{ label: 'Overview', link: '/numerics' }])).toBe(true);
 	});
 
 	it('injects the module pages, and the overview unless the site has its own', () => {

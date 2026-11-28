@@ -519,6 +519,9 @@ export default defineDocs({ /* ... */ pythonPackage: 'freeofcharge', methodcard:
 - `index: false` leaves the overview to the site: a hand-written
   `src/content/docs/numerics/index.mdx` (text with `<MethodCard>`s where they belong), still
   first in the sidebar group;
+- a `sidebar` that links to the pages itself (`{ label: 'Mesh', link: '/numerics/solver-mesh/' }`,
+  at any depth) gets no "Numerics" group: the site weaves the pages into its own sections, next
+  to the guides of the same part of the model;
 - `<MethodCard name="freeofcharge.deposition.deposit" />`, from
   `@max-models/starlight-theme/components/MethodCard.astro`, puts one card into an MDX page.
 
